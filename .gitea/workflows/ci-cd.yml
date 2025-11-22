@@ -2,16 +2,13 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [prod, develop]
-
-env:
-  DOCKER_REGISTRY: git.int.sktaurus.ru/sd
-  GO_VERSION: "1.24"
+    branches: [main, develop]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
 
 jobs:
-  # Сборка и публикация Docker образов
-  build-and-push:
-    name: Build & Push Docker Images
+  build-backend:
     runs-on: back
     steps:
       - name: Checkout code
@@ -20,176 +17,113 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Registry
+      - name: Login to Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.GIT_DOMAIN }}
-          username: ci
-          password: ${{ env.RUNNER_TOKEN }}
+          registry: registry.git.int.sktaurus.ru
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      # Back service
-      - name: Extract metadata for back
-        id: meta-back
+      - name: Extract metadata
+        id: meta-backend
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.GIT_DOMAIN }}/sd/sd_back
+          images: registry.git.int.sktaurus.ru/daniilsv/buildctl-back
           tags: |
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
-            type=raw,value=prod,enable=${{ github.ref == 'refs/heads/prod' }}
-            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
-      - name: Build and push back
+      - name: Build and push backend image
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: .infra/docker/Dockerfile
-          target: back-runner
-          platforms: linux/amd64
+          context: ./back
+          file: Dockerfile
           push: true
-          tags: ${{ steps.meta-back.outputs.tags }}
-          labels: ${{ steps.meta-back.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=registry,ref=registry.git.int.sktaurus.ru/daniilsv/buildctl-back:latest
+          cache-to: type=inline
 
-      # Notifier service
-      - name: Extract metadata for notifier
-        id: meta-notifier
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.GIT_DOMAIN }}/sd/sd_notifier
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
-            type=raw,value=prod,enable=${{ github.ref == 'refs/heads/prod' }}
-            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/develop' }}
-
-      - name: Build and push notifier
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: .infra/docker/Dockerfile
-          target: notifier-runner
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta-notifier.outputs.tags }}
-          labels: ${{ steps.meta-notifier.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
-
-      # Broker service
-      - name: Extract metadata for broker
-        id: meta-broker
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.GIT_DOMAIN }}/sd/sd_broker
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
-            type=raw,value=prod,enable=${{ github.ref == 'refs/heads/prod' }}
-            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/develop' }}
-
-      - name: Build and push broker
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: .infra/docker/Dockerfile
-          target: broker-runner
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta-broker.outputs.tags }}
-          labels: ${{ steps.meta-broker.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
-
-      # Integrations worker service
-      - name: Extract metadata for integrations_worker
-        id: meta-integrations_worker
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.GIT_DOMAIN }}/sd/sd_integrations_worker
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
-            type=raw,value=prod,enable=${{ github.ref == 'refs/heads/prod' }}
-            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/develop' }}
-
-      - name: Build and push integrations_worker
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: .infra/docker/Dockerfile
-          target: integrations_worker-runner
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta-integrations_worker.outputs.tags }}
-          labels: ${{ steps.meta-integrations_worker.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
-
-  # Деплой в development окружение
-  deploy-dev:
-    name: Deploy to Development
+  build-frontend:
     runs-on: back
-    needs: build-and-push
-    if: github.ref == 'refs/heads/develop'
-    environment: development
     steps:
-      - name: Deploy to development
-        run: |
-          echo "Deploying to development environment..."
-          # Отправляем webhook для перезагрузки compose stack
-          curl -X POST ${{vars.DEV_WEBHOOK_URL}}
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  # Деплой в production окружение
-  deploy-prod:
-    name: Deploy to Production
-    runs-on: back
-    needs: build-and-push
-    if: github.ref == 'refs/heads/prod'
-    environment: production
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: registry.git.int.sktaurus.ru
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: registry.git.int.sktaurus.ru/daniilsv/buildctl-front
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./front
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=registry,ref=registry.git.int.sktaurus.ru/daniilsv/buildctl-front:latest
+          cache-to: type=inline
+
+  build-cli:
+    runs-on: mobile
     steps:
-      - name: Deploy to production
-        run: |
-          echo "Deploying to production environment..."
-          # Здесь будет логика деплоя в prod окружение
-          curl -X POST ${{vars.PROD_WEBHOOK_URL}}
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  # Уведомления о статусе
-  notify:
-    name: Notify Status
-    runs-on: back
-    needs: [build-and-push]
-    if: always()
-    steps:
-      - name: Notify on success
-        if: needs.build-and-push.result == 'success'
-        run: |
-          echo "✅ Pipeline completed successfully"
-          # Здесь можно добавить отправку уведомлений в Slack, Teams и т.д.
+      # - name: Set up Go
+      #   uses: actions/setup-go@v5
+      #   with:
+      #     go-version: "1.25"
 
-      - name: Notify on failure
-        if: needs.build-and-push.result == 'failure'
+      - name: Build CLI for Linux AMD64
         run: |
-          echo "❌ Pipeline failed"
-          # Здесь можно добавить отправку уведомлений об ошибках
+          cd ./cli
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o buildctl-linux-amd64 ./cmd/buildctl
+
+      - name: Build CLI for Linux ARM64
+        run: |
+          cd ./cli
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o buildctl-linux-arm64 ./cmd/buildctl
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: buildctl-binaries
+          path: |
+            cli/buildctl-linux-amd64
+            cli/buildctl-linux-arm64
+          retention-days: 30
+
+      - name: Upload release artifacts on tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-binaries
+          path: |
+            cli/buildctl-linux-amd64
+            cli/buildctl-linux-arm64
+          retention-days: 90

@@ -1,10 +1,26 @@
 version: '3.8'
 
 services:
-  backend:
-    image: registry.git.int.sktaurus.ru/daniilsv/buildctl-back:latest
+  postgres:
+    image: postgis/postgis:18-3.6-alpine
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      POSTGRES_DB: build_assistant
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ../back
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/build_assistant?sslmode=disable
       OIDC_ISSUER: ${OIDC_ISSUER:-}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
@@ -22,11 +38,19 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       WORKER_POOL_SIZE: ${WORKER_POOL_SIZE:-3}
       PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   frontend:
-    image: registry.git.int.sktaurus.ru/daniilsv/buildctl-front:latest
+    build: ../front
     ports:
       - "3000:80"
     depends_on:
       - backend
+
+volumes:
+  postgres_data:
 
