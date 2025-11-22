@@ -28,7 +28,7 @@ jobs:
         id: meta-backend
         uses: docker/metadata-action@v5
         with:
-          images: registry.git.int.sktaurus.ru/daniilsv/buildctl-back
+          images: ${{ env.GIT_DOMAIN }}/daniilsv/buildctl-back
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -41,12 +41,15 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./back
-          file: Dockerfile
+          file: ./back/Dockerfile
+          platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta-backend.outputs.tags }}
-          labels: ${{ steps.meta-backend.outputs.labels }}
-          cache-from: type=registry,ref=registry.git.int.sktaurus.ru/daniilsv/buildctl-back:latest
-          cache-to: type=inline
+          tags: ${{ steps.meta-app.outputs.tags }}
+          labels: ${{ steps.meta-app.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
 
   build-frontend:
     runs-on: back
@@ -68,7 +71,7 @@ jobs:
         id: meta-frontend
         uses: docker/metadata-action@v5
         with:
-          images: registry.git.int.sktaurus.ru/daniilsv/buildctl-front
+          images: ${{ env.GIT_DOMAIN }}/daniilsv/buildctl-front
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -81,12 +84,15 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./front
-          file: Dockerfile
+          file: ./front/Dockerfile
+          platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta-frontend.outputs.tags }}
-          labels: ${{ steps.meta-frontend.outputs.labels }}
-          cache-from: type=registry,ref=registry.git.int.sktaurus.ru/daniilsv/buildctl-front:latest
-          cache-to: type=inline
+          tags: ${{ steps.meta-app.outputs.tags }}
+          labels: ${{ steps.meta-app.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
 
   build-cli:
     runs-on: mobile
