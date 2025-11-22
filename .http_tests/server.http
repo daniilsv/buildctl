@@ -1,0 +1,210 @@
+### Variables
+@baseUrl = http://localhost:8080
+@apiUrl = {{baseUrl}}/api/v1
+@token = YOUR_CLI_TOKEN_HERE
+@projectName = my-project
+@branchName = main
+@commitHash = abc123def456
+@buildId = YOUR_BUILD_UUID_HERE
+@tokenId = YOUR_TOKEN_UUID_HERE
+
+### Health Check
+GET {{baseUrl}}/health
+
+### Auth - Login (redirects to OIDC)
+GET {{baseUrl}}/auth/login
+
+### Auth - Callback (handled by OIDC provider)
+GET {{baseUrl}}/auth/callback?state=STATE&code=CODE
+
+### Auth - Logout
+GET {{baseUrl}}/auth/logout
+
+###
+### CLI Endpoints (require Bearer token)
+###
+
+### Send Build Event - Started
+POST {{apiUrl}}/events
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "project_name": "{{projectName}}",
+  "commit_hash": "{{commitHash}}",
+  "branch": "{{branchName}}",
+  "status": "started",
+  "log": "Build started successfully"
+}
+
+### Send Build Event - In Progress
+POST {{apiUrl}}/events
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "project_name": "{{projectName}}",
+  "commit_hash": "{{commitHash}}",
+  "branch": "{{branchName}}",
+  "status": "in_progress",
+  "log": "Installing dependencies..."
+}
+
+### Send Build Event - Success
+POST {{apiUrl}}/events
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "project_name": "{{projectName}}",
+  "commit_hash": "{{commitHash}}",
+  "branch": "{{branchName}}",
+  "status": "success",
+  "log": "Build completed successfully"
+}
+
+### Send Build Event - Failed
+POST {{apiUrl}}/events
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "project_name": "{{projectName}}",
+  "commit_hash": "{{commitHash}}",
+  "branch": "{{branchName}}",
+  "status": "failed",
+  "log": "Build failed: compilation error"
+}
+
+### Get Presigned URL for Artifact Upload
+POST {{apiUrl}}/artifacts/presign
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "project_name": "{{projectName}}",
+  "branch_name": "{{branchName}}",
+  "commit_hash": "{{commitHash}}",
+  "filename": "app.apk"
+}
+
+###
+### Web UI Endpoints (require OIDC session cookie)
+###
+
+### List Projects
+GET {{apiUrl}}/projects
+
+### Create Project
+POST {{apiUrl}}/projects
+Content-Type: application/json
+
+{
+  "name": "my-project",
+  "title": "My Project",
+  "repository_url": "sd/sd-back",
+  "repository_type": "gitea",
+  "access_token": "your-git-token",
+  "settings": {
+    "git_api_url": "https://git.int.sktaurus.ru/api/v1",
+    "telegram_chat_ids": [-4859320492],
+    "webhook_urls": ["https://portainer.example.com/webhook"]
+  }
+}
+
+### Get Project by Name
+GET {{apiUrl}}/projects/{{projectName}}
+
+### Get Project by ID
+GET {{apiUrl}}/projects/YOUR_PROJECT_UUID_HERE
+
+### Update Project
+PATCH {{apiUrl}}/projects/YOUR_PROJECT_UUID_HERE
+Content-Type: application/json
+
+{
+  "title": "Updated Project Title",
+  "settings": {
+    "git_api_url": "https://git.int.sktaurus.ru/api/v1",
+    "telegram_chat_ids": [-4859320492],
+    "webhook_urls": ["https://portainer.example.com/webhook", "https://another-webhook.com"]
+  }
+}
+
+### Delete Project
+DELETE {{apiUrl}}/projects/YOUR_PROJECT_UUID_HERE
+
+### List Branches for Project
+GET {{apiUrl}}/projects/{{projectName}}/branches
+
+### Get Branch by Name
+GET {{apiUrl}}/projects/{{projectName}}/branches/{{branchName}}
+
+### Create Branch
+POST {{apiUrl}}/projects/{{projectName}}/branches
+Content-Type: application/json
+
+{
+  "name": "develop",
+  "settings": {
+    "notifications_enabled": true,
+    "auto_deploy": false,
+    "telegram_chat_ids": [-4859320492],
+    "webhook_urls": ["https://dev-portainer.example.com/webhook"]
+  }
+}
+
+### Update Branch Settings
+PATCH {{apiUrl}}/projects/{{projectName}}/branches/{{branchName}}
+Content-Type: application/json
+
+{
+  "settings": {
+    "telegram_chat_ids": [-4859320492],
+    "webhook_urls": ["https://dev-portainer.example.com/webhook"]
+  }
+}
+
+### Get Builds by Branch
+GET {{apiUrl}}/projects/{{projectName}}/branches/{{branchName}}/builds
+
+### List Builds (all)
+GET {{apiUrl}}/builds
+
+### List Builds (filtered by project)
+GET {{apiUrl}}/builds?project_id=YOUR_PROJECT_UUID_HERE
+
+### List Builds (filtered by branch)
+GET {{apiUrl}}/builds?branch_id=YOUR_BRANCH_UUID_HERE
+
+### List Builds (filtered by project and branch)
+GET {{apiUrl}}/builds?project_id=YOUR_PROJECT_UUID_HERE&branch_id=YOUR_BRANCH_UUID_HERE
+
+### List Builds (with pagination)
+GET {{apiUrl}}/builds?limit=20&offset=0
+
+### Get Build by ID
+GET {{apiUrl}}/builds/{{buildId}}
+
+### List Access Tokens
+GET {{apiUrl}}/tokens
+
+### Create Access Token
+POST {{apiUrl}}/tokens
+Content-Type: application/json
+
+{
+  "name": "CI/CD Token",
+  "expires_at": 1735689600
+}
+
+### Create Access Token (without expiration)
+POST {{apiUrl}}/tokens
+Content-Type: application/json
+
+{
+  "name": "Permanent Token"
+}
+
+### Delete Access Token
+DELETE {{apiUrl}}/tokens/{{tokenId}}

@@ -1,0 +1,146 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "go: build backend",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "build",
+        "-o",
+        "${workspaceFolder}/back/bin/server",
+        "./cmd/server"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/back"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "go: build CLI",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "build",
+        "-o",
+        "${workspaceFolder}/cli/bin/buildctl",
+        "./cli/cmd/buildctl"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "go: run tests",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "test",
+        "./...",
+        "-v"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "sqlc: generate",
+      "type": "shell",
+      "command": "sqlc",
+      "args": ["generate"],
+      "options": {
+        "cwd": "${workspaceFolder}/back"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "migrate: up",
+      "type": "shell",
+      "command": "migrate",
+      "args": [
+        "-path",
+        "${workspaceFolder}/back/db/migrations",
+        "-database",
+        "postgres://postgres:postgres@localhost:5432/build_assistant?sslmode=disable",
+        "up"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "migrate: down",
+      "type": "shell",
+      "command": "migrate",
+      "args": [
+        "-path",
+        "${workspaceFolder}/back/db/migrations",
+        "-database",
+        "postgres://postgres:postgres@localhost:5432/build_assistant?sslmode=disable",
+        "down",
+        "1"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "docker: compose up",
+      "type": "shell",
+      "command": "docker-compose",
+      "args": [
+        "-f",
+        "${workspaceFolder}/.infra/docker-compose.yml",
+        "up",
+        "-d"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "docker: compose down",
+      "type": "shell",
+      "command": "docker-compose",
+      "args": [
+        "-f",
+        "${workspaceFolder}/.infra/docker-compose.yml",
+        "down"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: install",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["install"],
+      "options": {
+        "cwd": "${workspaceFolder}/front"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: dev",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "dev"],
+      "options": {
+        "cwd": "${workspaceFolder}/front"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: build",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "build"],
+      "options": {
+        "cwd": "${workspaceFolder}/front"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
+

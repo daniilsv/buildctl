@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "golang.go",
+    "ms-vscode.vscode-typescript-next",
+    "esbenp.prettier-vscode",
+    "ms-azuretools.vscode-docker",
+    "cweijan.vscode-postgresql-client2"
+  ]
+}
+
