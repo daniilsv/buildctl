@@ -39,13 +39,18 @@ export const deleteProject = async (name: string): Promise<void> => {
   await apiClient.delete(`/projects/${name}`)
 }
 
-export const testProjectNotifications = async (name: string): Promise<{ status: string; message: string }> => {
-  const { data } = await apiClient.post<{ status: string; message: string }>(`/projects/${name}/test-notifications`)
+export const testProjectTelegramNotification = async (name: string, chatID: string, threadID?: string): Promise<{ status: string; message: string }> => {
+  const { data } = await apiClient.post<{ status: string; message: string }>(`/projects/${name}/test-telegram`, {
+    chat_id: chatID,
+    thread_id: threadID || undefined,
+  })
   return data
 }
 
-export const testProjectWebhooks = async (name: string): Promise<{ status: string; message: string }> => {
-  const { data } = await apiClient.post<{ status: string; message: string }>(`/projects/${name}/test-webhooks`)
+export const testProjectWebhook = async (name: string, webhookURL: string): Promise<{ status: string; message: string }> => {
+  const { data } = await apiClient.post<{ status: string; message: string }>(`/projects/${name}/test-webhook`, {
+    webhook_url: webhookURL,
+  })
   return data
 }
 

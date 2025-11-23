@@ -141,7 +141,7 @@ func (h *Handler) GetBuilds(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(builds)
 }
 
-func (h *Handler) TestNotifications(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) TestTelegramNotification(w http.ResponseWriter, r *http.Request) {
 	projectName := chi.URLParam(r, "project_name")
 	branchName := chi.URLParam(r, "branch_name")
 
@@ -159,7 +159,21 @@ func (h *Handler) TestNotifications(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.notifier.SendTestNotification(r.Context(), dbProject, dbBranch); err != nil {
+	var req struct {
+		ChatID   string  `json:"chat_id"`
+		ThreadID *string `json:"thread_id,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.ChatID == "" {
+		http.Error(w, "chat_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.notifier.SendTestTelegramNotification(r.Context(), dbProject, dbBranch, req.ChatID, req.ThreadID); err != nil {
 		slog.Error("Failed to send test notification", "error", err)
 		http.Error(w, "Failed to send test notification: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -169,7 +183,7 @@ func (h *Handler) TestNotifications(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Test notification sent"})
 }
 
-func (h *Handler) TestWebhooks(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) TestWebhook(w http.ResponseWriter, r *http.Request) {
 	projectName := chi.URLParam(r, "project_name")
 	branchName := chi.URLParam(r, "branch_name")
 
@@ -187,13 +201,26 @@ func (h *Handler) TestWebhooks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.notifier.SendTestWebhooks(r.Context(), dbProject, dbBranch); err != nil {
-		slog.Error("Failed to send test webhooks", "error", err)
-		http.Error(w, "Failed to send test webhooks: "+err.Error(), http.StatusInternalServerError)
+	var req struct {
+		WebhookURL string `json:"webhook_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.WebhookURL == "" {
+		http.Error(w, "webhook_url is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.notifier.SendTestWebhook(r.Context(), dbProject, dbBranch, req.WebhookURL); err != nil {
+		slog.Error("Failed to send test webhook", "error", err)
+		http.Error(w, "Failed to send test webhook: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Test webhooks sent"})
+	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Test webhook sent"})
 }
 

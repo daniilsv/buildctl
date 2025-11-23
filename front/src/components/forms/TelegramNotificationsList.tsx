@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import { testProjectTelegramNotification, testBranchTelegramNotification } from '../../api'
 
 interface TelegramNotification {
   chat_id: string
@@ -11,13 +12,18 @@ interface TelegramNotification {
 interface TelegramNotificationsListProps {
   value: TelegramNotification[]
   onChange: (notifications: TelegramNotification[]) => void
+  projectName?: string
+  branchName?: string
 }
 
 export default function TelegramNotificationsList({
   value,
   onChange,
+  projectName,
+  branchName,
 }: TelegramNotificationsListProps) {
   const [notifications, setNotifications] = useState<TelegramNotification[]>(value || [])
+  const [testingIndex, setTestingIndex] = useState<number | null>(null)
 
   useEffect(() => {
     setNotifications(value || [])
@@ -43,6 +49,33 @@ export default function TelegramNotificationsList({
     }
     setNotifications(newNotifications)
     onChange(newNotifications)
+  }
+
+  const handleTest = async (index: number) => {
+    if (!projectName) {
+      alert('Project name is required for testing')
+      return
+    }
+
+    const notif = notifications[index]
+    if (!notif.chat_id.trim()) {
+      alert('Please enter Chat ID')
+      return
+    }
+
+    setTestingIndex(index)
+    try {
+      if (branchName) {
+        await testBranchTelegramNotification(projectName, branchName, notif.chat_id.trim(), notif.thread_id.trim() || undefined)
+      } else {
+        await testProjectTelegramNotification(projectName, notif.chat_id.trim(), notif.thread_id.trim() || undefined)
+      }
+      alert('Test notification sent successfully')
+    } catch (error: any) {
+      alert('Failed to send test notification: ' + (error.response?.data?.error || error.message))
+    } finally {
+      setTestingIndex(null)
+    }
   }
 
   return (
@@ -75,6 +108,17 @@ export default function TelegramNotificationsList({
                 placeholder="123"
               />
             </div>
+            {projectName && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleTest(index)}
+                disabled={testingIndex === index}
+              >
+                {testingIndex === index ? 'Testing...' : 'Test'}
+              </Button>
+            )}
             <Button
               type="button"
               variant="destructive"

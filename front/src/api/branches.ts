@@ -44,13 +44,18 @@ export const getBuildsByBranch = async (projectName: string, branchName: string)
   return data
 }
 
-export const testBranchNotifications = async (projectName: string, branchName: string): Promise<{ status: string; message: string }> => {
-  const { data } = await apiClient.post<{ status: string; message: string }>(`/projects/${projectName}/branches/${branchName}/test-notifications`)
+export const testBranchTelegramNotification = async (projectName: string, branchName: string, chatID: string, threadID?: string): Promise<{ status: string; message: string }> => {
+  const { data } = await apiClient.post<{ status: string; message: string }>(`/projects/${projectName}/branches/${branchName}/test-telegram`, {
+    chat_id: chatID,
+    thread_id: threadID || undefined,
+  })
   return data
 }
 
-export const testBranchWebhooks = async (projectName: string, branchName: string): Promise<{ status: string; message: string }> => {
-  const { data } = await apiClient.post<{ status: string; message: string }>(`/projects/${projectName}/branches/${branchName}/test-webhooks`)
+export const testBranchWebhook = async (projectName: string, branchName: string, webhookURL: string): Promise<{ status: string; message: string }> => {
+  const { data } = await apiClient.post<{ status: string; message: string }>(`/projects/${projectName}/branches/${branchName}/test-webhook`, {
+    webhook_url: webhookURL,
+  })
   return data
 }
 

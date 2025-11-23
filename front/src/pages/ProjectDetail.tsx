@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { deleteProject, getBuilds, getProjectByName, updateProject, testProjectNotifications, testProjectWebhooks } from "../api";
-import { getBranches, updateBranch, testBranchNotifications, testBranchWebhooks } from "../api/branches";
+import { deleteProject, getBuilds, getProjectByName, updateProject } from "../api";
+import { getBranches, updateBranch } from "../api/branches";
 import CreateBranchForm from "../components/forms/CreateBranchForm";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -256,17 +256,13 @@ function EditProjectForm({
         .filter((notif) => notif.chat_id.trim() !== "")
         .map((notif) => {
           const notification: any = {
-            chat_id: parseInt(notif.chat_id.trim()),
+            chat_id: notif.chat_id.trim(),
           };
           if (notif.thread_id.trim() !== "") {
-            const threadId = parseInt(notif.thread_id.trim());
-            if (!isNaN(threadId)) {
-              notification.thread_id = threadId;
-            }
+            notification.thread_id = notif.thread_id.trim();
           }
           return notification;
-        })
-        .filter((notif) => !isNaN(notif.chat_id));
+        });
     }
 
     if (webhookUrls.length > 0) {
@@ -345,43 +341,14 @@ function EditProjectForm({
       <TelegramNotificationsList
         value={telegramNotifications}
         onChange={setTelegramNotifications}
+        projectName={project.name}
       />
 
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={async () => {
-            try {
-              await testProjectNotifications(project.name);
-              alert("Test notification sent successfully");
-            } catch (error: any) {
-              alert("Failed to send test notification: " + (error.response?.data?.error || error.message));
-            }
-          }}
-        >
-          Test Telegram Notifications
-        </Button>
-      </div>
-
-      <WebhookUrlsList value={webhookUrls} onChange={setWebhookUrls} />
-
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={async () => {
-            try {
-              await testProjectWebhooks(project.name);
-              alert("Test webhooks sent successfully");
-            } catch (error: any) {
-              alert("Failed to send test webhooks: " + (error.response?.data?.error || error.message));
-            }
-          }}
-        >
-          Test Webhooks
-        </Button>
-      </div>
+      <WebhookUrlsList 
+        value={webhookUrls} 
+        onChange={setWebhookUrls}
+        projectName={project.name}
+      />
 
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onSuccess}>
@@ -421,17 +388,13 @@ function EditBranchButton({ projectName, branchName, branch }: { projectName: st
         .filter((notif) => notif.chat_id.trim() !== "")
         .map((notif) => {
           const notification: any = {
-            chat_id: parseInt(notif.chat_id.trim()),
+            chat_id: notif.chat_id.trim(),
           };
           if (notif.thread_id.trim() !== "") {
-            const threadId = parseInt(notif.thread_id.trim());
-            if (!isNaN(threadId)) {
-              notification.thread_id = threadId;
-            }
+            notification.thread_id = notif.thread_id.trim();
           }
           return notification;
-        })
-        .filter((notif) => !isNaN(notif.chat_id));
+        });
     }
 
     if (webhookUrls.length > 0) {
@@ -457,43 +420,16 @@ function EditBranchButton({ projectName, branchName, branch }: { projectName: st
             <TelegramNotificationsList
               value={telegramNotifications}
               onChange={setTelegramNotifications}
+              projectName={projectName}
+              branchName={branchName}
             />
 
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={async () => {
-                  try {
-                    await testBranchNotifications(projectName, branchName);
-                    alert("Test notification sent successfully");
-                  } catch (error: any) {
-                    alert("Failed to send test notification: " + (error.response?.data?.error || error.message));
-                  }
-                }}
-              >
-                Test Telegram Notifications
-              </Button>
-            </div>
-
-            <WebhookUrlsList value={webhookUrls} onChange={setWebhookUrls} />
-
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={async () => {
-                  try {
-                    await testBranchWebhooks(projectName, branchName);
-                    alert("Test webhooks sent successfully");
-                  } catch (error: any) {
-                    alert("Failed to send test webhooks: " + (error.response?.data?.error || error.message));
-                  }
-                }}
-              >
-                Test Webhooks
-              </Button>
-            </div>
+            <WebhookUrlsList 
+              value={webhookUrls} 
+              onChange={setWebhookUrls}
+              projectName={projectName}
+              branchName={branchName}
+            />
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>

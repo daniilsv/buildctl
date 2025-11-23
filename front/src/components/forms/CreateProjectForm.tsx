@@ -51,17 +51,13 @@ export default function CreateProjectForm() {
         .filter((notif) => notif.chat_id.trim() !== '')
         .map((notif) => {
           const notification: any = {
-            chat_id: parseInt(notif.chat_id.trim()),
+            chat_id: notif.chat_id.trim(),
           }
           if (notif.thread_id.trim() !== '') {
-            const threadId = parseInt(notif.thread_id.trim())
-            if (!isNaN(threadId)) {
-              notification.thread_id = threadId
-            }
+            notification.thread_id = notif.thread_id.trim()
           }
           return notification
         })
-        .filter((notif) => !isNaN(notif.chat_id))
     }
 
     if (webhookUrls.length > 0) {
