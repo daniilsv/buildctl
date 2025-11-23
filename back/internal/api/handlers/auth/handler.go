@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"log/slog"
 
@@ -66,21 +67,47 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, claims, err := h.service.ExchangeCode(r.Context(), code)
+	accessToken, _, err := h.service.ExchangeCode(r.Context(), code)
 	if err != nil {
 		slog.Error("Failed to exchange code", "error", err)
 		http.Error(w, "Authentication failed", http.StatusInternalServerError)
 		return
 	}
 
-	response := map[string]interface{}{
-		"access_token": accessToken,
-		"user_id":      claims.Subject,
-		"email":        claims.Email,
-	}
+	// Return HTML page that will save token and redirect
+	// Escape token to prevent XSS - escape quotes, backslashes, and newlines
+	escapedToken := strings.ReplaceAll(accessToken, `\`, `\\`)
+	escapedToken = strings.ReplaceAll(escapedToken, `"`, `\"`)
+	escapedToken = strings.ReplaceAll(escapedToken, "'", `\'`)
+	escapedToken = strings.ReplaceAll(escapedToken, "\n", `\n`)
+	escapedToken = strings.ReplaceAll(escapedToken, "\r", `\r`)
+	escapedToken = strings.ReplaceAll(escapedToken, "</script>", `<\/script>`)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	html := `<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Authenticating...</title>
+</head>
+<body>
+	<script>
+		(function() {
+			try {
+				const token = "` + escapedToken + `";
+				localStorage.setItem('access_token', token);
+				window.location.href = '/';
+			} catch (e) {
+				console.error('Failed to save token:', e);
+				window.location.href = '/auth/login';
+			}
+		})();
+	</script>
+	<p>Authenticating... Redirecting...</p>
+</body>
+</html>`
+
+	w.Header().Set("Content-Type", "text/html")
+	_, _ = w.Write([]byte(html))
 }
 
 func (h *Handler) UserInfo(w http.ResponseWriter, r *http.Request) {
@@ -96,5 +123,5 @@ func (h *Handler) UserInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
