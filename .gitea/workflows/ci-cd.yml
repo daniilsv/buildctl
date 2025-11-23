@@ -3,13 +3,13 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [main, develop]
-    tags: ["v*"]
-  pull_request:
-    branches: [main]
+    # tags: ["v*"]
+  # pull_request:
+  #   branches: [main]
 
 jobs:
   build:
-    runs-on: back
+    runs-on: mobile
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -134,18 +134,3 @@ jobs:
             --branch="${{ github.ref_name }}" \
             --status="failed"
         continue-on-error: true
-
-  deploy:
-    runs-on: back
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy
-        run: |
-          echo "Deployment step - update docker-compose or pull images"
-          # Здесь должна быть логика деплоя
-          # Например: docker-compose pull && docker-compose up -d
-          # или обновление через SSH/API
