@@ -39,3 +39,13 @@ export const deleteProject = async (name: string): Promise<void> => {
   await apiClient.delete(`/projects/${name}`)
 }
 
+export const testProjectNotifications = async (name: string): Promise<{ status: string; message: string }> => {
+  const { data } = await apiClient.post<{ status: string; message: string }>(`/projects/${name}/test-notifications`)
+  return data
+}
+
+export const testProjectWebhooks = async (name: string): Promise<{ status: string; message: string }> => {
+  const { data } = await apiClient.post<{ status: string; message: string }>(`/projects/${name}/test-webhooks`)
+  return data
+}
+

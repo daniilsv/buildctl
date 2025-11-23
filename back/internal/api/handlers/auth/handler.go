@@ -7,19 +7,17 @@ import (
 
 	"log/slog"
 
-	"github.com/build-assistant/back/internal/auth"
+	"github.com/build-assistant/back/internal/api/middleware"
+	authpkg "github.com/build-assistant/back/internal/auth"
 )
 
 type Service interface {
 	GenerateAuthURL() (string, string, error)
 	VerifyState(state string) bool
-	ExchangeCode(ctx context.Context, code string) (*IDTokenClaims, error)
-	GetSession(r *http.Request) (*auth.Session, error)
-	CreateSession(w http.ResponseWriter, userID, email string) error
-	ClearSession(w http.ResponseWriter, r *http.Request) error
+	ExchangeCode(ctx context.Context, code string) (string, *IDTokenClaims, error)
 }
 
-type IDTokenClaims = auth.IDTokenClaims
+type IDTokenClaims = authpkg.IDTokenClaims
 
 type Handler struct {
 	service Service
@@ -68,52 +66,33 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claims, err := h.service.ExchangeCode(r.Context(), code)
+	accessToken, claims, err := h.service.ExchangeCode(r.Context(), code)
 	if err != nil {
 		slog.Error("Failed to exchange code", "error", err)
 		http.Error(w, "Authentication failed", http.StatusInternalServerError)
 		return
 	}
 
-	if err := h.service.CreateSession(w, claims.Subject, claims.Email); err != nil {
-		slog.Error("Failed to create session", "error", err)
-		http.Error(w, "Failed to create session", http.StatusInternalServerError)
-		return
+	response := map[string]interface{}{
+		"access_token": accessToken,
+		"user_id":      claims.Subject,
+		"email":        claims.Email,
 	}
 
-	http.Redirect(w, r, "/", http.StatusFound)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
-func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.ClearSession(w, r); err != nil {
-		slog.Error("Failed to clear session", "error", err)
-	}
-	http.Redirect(w, r, "/auth/login", http.StatusFound)
-}
-
-func (h *Handler) RequireAuth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		session, err := h.service.GetSession(r)
-		if err != nil {
-			http.Redirect(w, r, "/auth/login", http.StatusFound)
-			return
-		}
-
-		ctx := context.WithValue(r.Context(), "session", session)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
-	session, err := h.service.GetSession(r)
-	if err != nil {
+func (h *Handler) UserInfo(w http.ResponseWriter, r *http.Request) {
+	userInfo := middleware.GetUserInfo(r.Context())
+	if userInfo == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	response := map[string]interface{}{
-		"user_id": session.UserID,
-		"email":   session.Email,
+		"user_id": userInfo.Subject,
+		"email":   userInfo.Email,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

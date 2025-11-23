@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	db "github.com/build-assistant/back/db/gen"
 	"github.com/build-assistant/back/internal/api/handlers/branches"
 )
@@ -167,4 +168,25 @@ func toBranch(b db.Branch) *branches.Branch {
 	}
 
 	return branch
+}
+
+func (s *BranchService) GetProjectByNameDB(ctx context.Context, name string) (*db.Project, error) {
+	dbProject, err := s.queries.GetProjectByName(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("project not found: %w", err)
+	}
+
+	return &dbProject, nil
+}
+
+func (s *BranchService) GetBranchByProjectAndNameDB(ctx context.Context, projectID uuid.UUID, branchName string) (*db.Branch, error) {
+	dbBranch, err := s.queries.GetBranchByProjectAndName(ctx, &db.GetBranchByProjectAndNameParams{
+		ProjectID: projectID,
+		Name:      branchName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("branch not found: %w", err)
+	}
+
+	return &dbBranch, nil
 }

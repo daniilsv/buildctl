@@ -1,4 +1,18 @@
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { getToken } from '../utils/auth'
+
 export default function Login() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    // If already authenticated, redirect to home
+    if (getToken()) {
+      navigate('/')
+      return
+    }
+  }, [navigate])
+
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
       <div>

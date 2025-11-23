@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { deleteProject, getBuilds, getProjectByName, updateProject } from "../api";
-import { getBranches, updateBranch } from "../api/branches";
+import { deleteProject, getBuilds, getProjectByName, updateProject, testProjectNotifications, testProjectWebhooks } from "../api";
+import { getBranches, updateBranch, testBranchNotifications, testBranchWebhooks } from "../api/branches";
 import CreateBranchForm from "../components/forms/CreateBranchForm";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -13,6 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Select } from "../components/ui/select";
+import TelegramNotificationsList from "../components/forms/TelegramNotificationsList";
+import WebhookUrlsList from "../components/forms/WebhookUrlsList";
 
 export default function ProjectDetail() {
   const { id: projectName } = useParams<{ id: string }>();
@@ -226,11 +228,19 @@ function EditProjectForm({
   const [gitApiUrl, setGitApiUrl] = useState(
     project.settings?.git_api_url || "https://git.int.sktaurus.ru/api/v1"
   );
-  const [telegramChatIds, setTelegramChatIds] = useState(
-    project.settings?.telegram_chat_ids?.join(", ") || ""
-  );
-  const [webhookUrls, setWebhookUrls] = useState(
-    project.settings?.webhook_urls?.join(", ") || ""
+  const [telegramNotifications, setTelegramNotifications] = useState<
+    Array<{ chat_id: string; thread_id: string }>
+  >(() => {
+    if (project.settings?.telegram_notifications) {
+      return project.settings.telegram_notifications.map((notif: any) => ({
+        chat_id: String(notif.chat_id || ""),
+        thread_id: notif.thread_id ? String(notif.thread_id) : "",
+      }));
+    }
+    return [];
+  });
+  const [webhookUrls, setWebhookUrls] = useState<string[]>(
+    project.settings?.webhook_urls || []
   );
   const queryClient = useQueryClient();
 
@@ -241,18 +251,26 @@ function EditProjectForm({
       git_api_url: gitApiUrl,
     };
 
-    if (telegramChatIds) {
-      settings.telegram_chat_ids = telegramChatIds
-        .split(",")
-        .map((id: string) => parseInt(id.trim()))
-        .filter((id: number) => !isNaN(id));
+    if (telegramNotifications.length > 0) {
+      settings.telegram_notifications = telegramNotifications
+        .filter((notif) => notif.chat_id.trim() !== "")
+        .map((notif) => {
+          const notification: any = {
+            chat_id: parseInt(notif.chat_id.trim()),
+          };
+          if (notif.thread_id.trim() !== "") {
+            const threadId = parseInt(notif.thread_id.trim());
+            if (!isNaN(threadId)) {
+              notification.thread_id = threadId;
+            }
+          }
+          return notification;
+        })
+        .filter((notif) => !isNaN(notif.chat_id));
     }
 
-    if (webhookUrls) {
-      settings.webhook_urls = webhookUrls
-        .split(",")
-        .map((url: string) => url.trim())
-        .filter((url: string) => url);
+    if (webhookUrls.length > 0) {
+      settings.webhook_urls = webhookUrls.filter((url) => url.trim() !== "");
     }
 
     await updateProject(project.name, {
@@ -324,26 +342,45 @@ function EditProjectForm({
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="telegram">Telegram Chat IDs (comma-separated)</Label>
-        <Input
-          id="telegram"
-          type="text"
-          value={telegramChatIds}
-          onChange={(e) => setTelegramChatIds(e.target.value)}
-          placeholder="-4859320492"
-        />
+      <TelegramNotificationsList
+        value={telegramNotifications}
+        onChange={setTelegramNotifications}
+      />
+
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={async () => {
+            try {
+              await testProjectNotifications(project.name);
+              alert("Test notification sent successfully");
+            } catch (error: any) {
+              alert("Failed to send test notification: " + (error.response?.data?.error || error.message));
+            }
+          }}
+        >
+          Test Telegram Notifications
+        </Button>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="webhooks">Webhook URLs (comma-separated)</Label>
-        <Input
-          id="webhooks"
-          type="text"
-          value={webhookUrls}
-          onChange={(e) => setWebhookUrls(e.target.value)}
-          placeholder="https://portainer.example.com/webhook"
-        />
+      <WebhookUrlsList value={webhookUrls} onChange={setWebhookUrls} />
+
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={async () => {
+            try {
+              await testProjectWebhooks(project.name);
+              alert("Test webhooks sent successfully");
+            } catch (error: any) {
+              alert("Failed to send test webhooks: " + (error.response?.data?.error || error.message));
+            }
+          }}
+        >
+          Test Webhooks
+        </Button>
       </div>
 
       <DialogFooter>
@@ -358,11 +395,19 @@ function EditProjectForm({
 
 function EditBranchButton({ projectName, branchName, branch }: { projectName: string; branchName: string; branch: any }) {
   const [open, setOpen] = useState(false);
-  const [telegramChatIds, setTelegramChatIds] = useState(
-    branch.settings?.telegram_chat_ids?.join(", ") || ""
-  );
-  const [webhookUrls, setWebhookUrls] = useState(
-    branch.settings?.webhook_urls?.join(", ") || ""
+  const [telegramNotifications, setTelegramNotifications] = useState<
+    Array<{ chat_id: string; thread_id: string }>
+  >(() => {
+    if (branch.settings?.telegram_notifications) {
+      return branch.settings.telegram_notifications.map((notif: any) => ({
+        chat_id: String(notif.chat_id || ""),
+        thread_id: notif.thread_id ? String(notif.thread_id) : "",
+      }));
+    }
+    return [];
+  });
+  const [webhookUrls, setWebhookUrls] = useState<string[]>(
+    branch.settings?.webhook_urls || []
   );
   const queryClient = useQueryClient();
 
@@ -371,18 +416,26 @@ function EditBranchButton({ projectName, branchName, branch }: { projectName: st
 
     const settings: Record<string, any> = {};
 
-    if (telegramChatIds) {
-      settings.telegram_chat_ids = telegramChatIds
-        .split(",")
-        .map((id: string) => parseInt(id.trim()))
-        .filter((id: number) => !isNaN(id));
+    if (telegramNotifications.length > 0) {
+      settings.telegram_notifications = telegramNotifications
+        .filter((notif) => notif.chat_id.trim() !== "")
+        .map((notif) => {
+          const notification: any = {
+            chat_id: parseInt(notif.chat_id.trim()),
+          };
+          if (notif.thread_id.trim() !== "") {
+            const threadId = parseInt(notif.thread_id.trim());
+            if (!isNaN(threadId)) {
+              notification.thread_id = threadId;
+            }
+          }
+          return notification;
+        })
+        .filter((notif) => !isNaN(notif.chat_id));
     }
 
-    if (webhookUrls) {
-      settings.webhook_urls = webhookUrls
-        .split(",")
-        .map((url: string) => url.trim())
-        .filter((url: string) => url);
+    if (webhookUrls.length > 0) {
+      settings.webhook_urls = webhookUrls.filter((url) => url.trim() !== "");
     }
 
     await updateBranch(projectName, branchName, { settings });
@@ -401,26 +454,45 @@ function EditBranchButton({ projectName, branchName, branch }: { projectName: st
             <DialogTitle>Edit Branch Settings</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="branch-telegram">Telegram Chat IDs (comma-separated)</Label>
-              <Input
-                id="branch-telegram"
-                type="text"
-                value={telegramChatIds}
-                onChange={(e) => setTelegramChatIds(e.target.value)}
-                placeholder="-4859320492"
-              />
+            <TelegramNotificationsList
+              value={telegramNotifications}
+              onChange={setTelegramNotifications}
+            />
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    await testBranchNotifications(projectName, branchName);
+                    alert("Test notification sent successfully");
+                  } catch (error: any) {
+                    alert("Failed to send test notification: " + (error.response?.data?.error || error.message));
+                  }
+                }}
+              >
+                Test Telegram Notifications
+              </Button>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="branch-webhooks">Webhook URLs (comma-separated)</Label>
-              <Input
-                id="branch-webhooks"
-                type="text"
-                value={webhookUrls}
-                onChange={(e) => setWebhookUrls(e.target.value)}
-                placeholder="https://portainer.example.com/webhook"
-              />
+            <WebhookUrlsList value={webhookUrls} onChange={setWebhookUrls} />
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    await testBranchWebhooks(projectName, branchName);
+                    alert("Test webhooks sent successfully");
+                  } catch (error: any) {
+                    alert("Failed to send test webhooks: " + (error.response?.data?.error || error.message));
+                  }
+                }}
+              >
+                Test Webhooks
+              </Button>
             </div>
 
             <DialogFooter>

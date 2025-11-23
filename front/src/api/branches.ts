@@ -44,3 +44,13 @@ export const getBuildsByBranch = async (projectName: string, branchName: string)
   return data
 }
 
+export const testBranchNotifications = async (projectName: string, branchName: string): Promise<{ status: string; message: string }> => {
+  const { data } = await apiClient.post<{ status: string; message: string }>(`/projects/${projectName}/branches/${branchName}/test-notifications`)
+  return data
+}
+
+export const testBranchWebhooks = async (projectName: string, branchName: string): Promise<{ status: string; message: string }> => {
+  const { data } = await apiClient.post<{ status: string; message: string }>(`/projects/${projectName}/branches/${branchName}/test-webhooks`)
+  return data
+}
+

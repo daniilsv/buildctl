@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { useTheme } from './theme-provider'
 import { Moon, Sun } from 'lucide-react'
 import { Button } from './ui/button'
+import { getToken, removeToken } from '../utils/auth'
 import apiClient from '../api/client'
 
 export default function Layout() {
@@ -10,6 +11,10 @@ export default function Layout() {
   const { theme, setTheme } = useTheme()
 
   useEffect(() => {
+    if (!getToken()) {
+      navigate('/auth/login')
+      return
+    }
     apiClient.get('/projects').catch(() => {
       navigate('/auth/login')
     })
@@ -38,9 +43,15 @@ export default function Layout() {
             <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
             <span className="sr-only">Toggle theme</span>
           </Button>
-          <a href="/auth/logout" className="text-sm hover:underline">
+          <button
+            onClick={() => {
+              removeToken()
+              navigate('/auth/login')
+            }}
+            className="text-sm hover:underline"
+          >
             Logout
-          </a>
+          </button>
         </div>
       </nav>
       <main className="flex-1 container mx-auto px-4 py-8">

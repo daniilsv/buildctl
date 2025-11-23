@@ -7,7 +7,10 @@ import (
 
 	"log/slog"
 
+	db "github.com/build-assistant/back/db/gen"
+	"github.com/build-assistant/back/internal/notifications"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 type Service interface {
@@ -16,6 +19,7 @@ type Service interface {
 	ListProjects(ctx context.Context) ([]Project, error)
 	UpdateProject(ctx context.Context, name string, req UpdateProjectRequest) (*Project, error)
 	DeleteProject(ctx context.Context, name string) error
+	GetProjectByNameDB(ctx context.Context, name string) (*db.Project, error)
 }
 
 type Project struct {
@@ -47,11 +51,12 @@ type UpdateProjectRequest struct {
 }
 
 type Handler struct {
-	service Service
+	service  Service
+	notifier notifications.Notifier
 }
 
-func NewHandler(service Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service Service, notifier notifications.Notifier) *Handler {
+	return &Handler{service: service, notifier: notifier}
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
@@ -69,7 +74,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(project)
+	_ = json.NewEncoder(w).Encode(project)
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +87,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(project)
+	_ = json.NewEncoder(w).Encode(project)
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +99,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(projects)
+	_ = json.NewEncoder(w).Encode(projects)
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +118,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(project)
+	_ = json.NewEncoder(w).Encode(project)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -125,4 +130,56 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) TestNotifications(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	dbProject, err := h.service.GetProjectByNameDB(r.Context(), name)
+	if err != nil {
+		slog.Error("Failed to get project", "error", err)
+		http.Error(w, "Project not found", http.StatusNotFound)
+		return
+	}
+
+	branch := &db.Branch{
+		ID:        uuid.New(),
+		ProjectID: dbProject.ID,
+		Name:      "test",
+		Settings:  []byte(`{}`),
+	}
+
+	if err := h.notifier.SendTestNotification(r.Context(), dbProject, branch); err != nil {
+		slog.Error("Failed to send test notification", "error", err)
+		http.Error(w, "Failed to send test notification: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Test notification sent"})
+}
+
+func (h *Handler) TestWebhooks(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	dbProject, err := h.service.GetProjectByNameDB(r.Context(), name)
+	if err != nil {
+		slog.Error("Failed to get project", "error", err)
+		http.Error(w, "Project not found", http.StatusNotFound)
+		return
+	}
+
+	branch := &db.Branch{
+		ID:        uuid.New(),
+		ProjectID: dbProject.ID,
+		Name:      "test",
+		Settings:  []byte(`{}`),
+	}
+
+	if err := h.notifier.SendTestWebhooks(r.Context(), dbProject, branch); err != nil {
+		slog.Error("Failed to send test webhooks", "error", err)
+		http.Error(w, "Failed to send test webhooks: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Test webhooks sent"})
 }

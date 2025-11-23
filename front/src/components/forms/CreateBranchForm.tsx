@@ -5,6 +5,8 @@ import { createBranch } from '../../api/branches'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import TelegramNotificationsList from './TelegramNotificationsList'
+import WebhookUrlsList from './WebhookUrlsList'
 
 interface CreateBranchFormProps {
   onSuccess?: () => void
@@ -15,6 +17,8 @@ export default function CreateBranchForm({ onSuccess }: CreateBranchFormProps) {
   const [name, setName] = useState('')
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [autoDeploy, setAutoDeploy] = useState(false)
+  const [telegramNotifications, setTelegramNotifications] = useState<Array<{ chat_id: string; thread_id: string }>>([])
+  const [webhookUrls, setWebhookUrls] = useState<string[]>([])
 
   const queryClient = useQueryClient()
 
@@ -26,6 +30,8 @@ export default function CreateBranchForm({ onSuccess }: CreateBranchFormProps) {
       setName('')
       setNotificationsEnabled(true)
       setAutoDeploy(false)
+      setTelegramNotifications([])
+      setWebhookUrls([])
       if (onSuccess) {
         onSuccess()
       }
@@ -35,12 +41,36 @@ export default function CreateBranchForm({ onSuccess }: CreateBranchFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
+    const settings: Record<string, any> = {
+      notifications_enabled: notificationsEnabled,
+      auto_deploy: autoDeploy,
+    }
+
+    if (telegramNotifications.length > 0) {
+      settings.telegram_notifications = telegramNotifications
+        .filter((notif) => notif.chat_id.trim() !== '')
+        .map((notif) => {
+          const notification: any = {
+            chat_id: parseInt(notif.chat_id.trim()),
+          }
+          if (notif.thread_id.trim() !== '') {
+            const threadId = parseInt(notif.thread_id.trim())
+            if (!isNaN(threadId)) {
+              notification.thread_id = threadId
+            }
+          }
+          return notification
+        })
+        .filter((notif) => !isNaN(notif.chat_id))
+    }
+
+    if (webhookUrls.length > 0) {
+      settings.webhook_urls = webhookUrls.filter((url) => url.trim() !== '')
+    }
+
     mutation.mutate({
       name,
-      settings: {
-        notifications_enabled: notificationsEnabled,
-        auto_deploy: autoDeploy,
-      },
+      settings,
     })
   }
 
@@ -83,6 +113,13 @@ export default function CreateBranchForm({ onSuccess }: CreateBranchFormProps) {
           Auto Deploy
         </Label>
       </div>
+
+      <TelegramNotificationsList
+        value={telegramNotifications}
+        onChange={setTelegramNotifications}
+      />
+
+      <WebhookUrlsList value={webhookUrls} onChange={setWebhookUrls} />
 
       {mutation.isError && (
         <div className="text-sm text-destructive">

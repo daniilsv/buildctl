@@ -19,7 +19,6 @@ func NewRouter(h *handlers.Handlers) chi.Router {
 	r.Route("/auth", func(r chi.Router) {
 		r.Get("/login", h.Auth.Login)
 		r.Get("/callback", h.Auth.Callback)
-		r.Get("/logout", h.Auth.Logout)
 	})
 
 	r.Route("/api/v1", func(r chi.Router) {
@@ -33,20 +32,29 @@ func NewRouter(h *handlers.Handlers) chi.Router {
 			r.Post("/presign", h.Artifacts.Presign)
 		})
 
+		r.Route("/auth", func(r chi.Router) {
+			r.Use(middleware.OIDCAuth(h.OIDCService, h.TokenCache))
+			r.Get("/userinfo", h.Auth.UserInfo)
+		})
+
 		r.Group(func(r chi.Router) {
-			r.Use(h.Auth.RequireAuth)
+			r.Use(middleware.OIDCAuth(h.OIDCService, h.TokenCache))
 			r.Route("/projects", func(r chi.Router) {
 				r.Get("/", h.Projects.List)
 				r.Post("/", h.Projects.Create)
 				r.Get("/{name}", h.Projects.Get)
 				r.Patch("/{name}", h.Projects.Update)
 				r.Delete("/{name}", h.Projects.Delete)
+				r.Post("/{name}/test-notifications", h.Projects.TestNotifications)
+				r.Post("/{name}/test-webhooks", h.Projects.TestWebhooks)
 				r.Route("/{project_name}/branches", func(r chi.Router) {
 					r.Get("/", h.Branches.List)
 					r.Post("/", h.Branches.Create)
 					r.Get("/{branch_name}", h.Branches.Get)
 					r.Patch("/{branch_name}", h.Branches.Update)
 					r.Get("/{branch_name}/builds", h.Branches.GetBuilds)
+					r.Post("/{branch_name}/test-notifications", h.Branches.TestNotifications)
+					r.Post("/{branch_name}/test-webhooks", h.Branches.TestWebhooks)
 				})
 			})
 

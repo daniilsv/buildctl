@@ -6,6 +6,8 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Select } from '../ui/select'
+import TelegramNotificationsList from './TelegramNotificationsList'
+import WebhookUrlsList from './WebhookUrlsList'
 
 interface CreateProjectData {
   name: string
@@ -23,8 +25,8 @@ export default function CreateProjectForm() {
   const [repositoryType, setRepositoryType] = useState('gitea')
   const [accessToken, setAccessToken] = useState('')
   const [gitApiUrl, setGitApiUrl] = useState('https://git.int.sktaurus.ru/api/v1')
-  const [telegramChatIds, setTelegramChatIds] = useState('')
-  const [webhookUrls, setWebhookUrls] = useState('')
+  const [telegramNotifications, setTelegramNotifications] = useState<Array<{ chat_id: string; thread_id: string }>>([])
+  const [webhookUrls, setWebhookUrls] = useState<string[]>([])
 
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -44,12 +46,26 @@ export default function CreateProjectForm() {
       git_api_url: gitApiUrl,
     }
 
-    if (telegramChatIds) {
-      settings.telegram_chat_ids = telegramChatIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
+    if (telegramNotifications.length > 0) {
+      settings.telegram_notifications = telegramNotifications
+        .filter((notif) => notif.chat_id.trim() !== '')
+        .map((notif) => {
+          const notification: any = {
+            chat_id: parseInt(notif.chat_id.trim()),
+          }
+          if (notif.thread_id.trim() !== '') {
+            const threadId = parseInt(notif.thread_id.trim())
+            if (!isNaN(threadId)) {
+              notification.thread_id = threadId
+            }
+          }
+          return notification
+        })
+        .filter((notif) => !isNaN(notif.chat_id))
     }
 
-    if (webhookUrls) {
-      settings.webhook_urls = webhookUrls.split(',').map(url => url.trim()).filter(url => url)
+    if (webhookUrls.length > 0) {
+      settings.webhook_urls = webhookUrls.filter((url) => url.trim() !== '')
     }
 
     mutation.mutate({
@@ -132,27 +148,12 @@ export default function CreateProjectForm() {
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="telegram">Telegram Chat IDs (comma-separated)</Label>
-        <Input
-          id="telegram"
-          type="text"
-          value={telegramChatIds}
-          onChange={(e) => setTelegramChatIds(e.target.value)}
-          placeholder="-4859320492"
-        />
-      </div>
+      <TelegramNotificationsList
+        value={telegramNotifications}
+        onChange={setTelegramNotifications}
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="webhooks">Webhook URLs (comma-separated)</Label>
-        <Input
-          id="webhooks"
-          type="text"
-          value={webhookUrls}
-          onChange={(e) => setWebhookUrls(e.target.value)}
-          placeholder="https://portainer.example.com/webhook"
-        />
-      </div>
+      <WebhookUrlsList value={webhookUrls} onChange={setWebhookUrls} />
 
       {mutation.isError && (
         <div className="text-sm text-destructive">

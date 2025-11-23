@@ -116,8 +116,8 @@ func setupDependencies(cfg *config.Config) (*handlers.Dependencies, error) {
 		return nil, fmt.Errorf("failed to create OIDC service: %w", err)
 	}
 
-	sessionStore := auth.NewInMemorySessionStore()
-	authService := auth.NewAuthService(oidcService, sessionStore)
+	tokenCache := auth.NewTokenCache(1 * time.Hour)
+	authService := auth.NewAuthService(oidcService, nil)
 
 	tokenService := services.NewTokenService(queries)
 	projectService := services.NewProjectService(queries)
@@ -135,5 +135,8 @@ func setupDependencies(cfg *config.Config) (*handlers.Dependencies, error) {
 		ArtifactService: artifactService,
 		TokenService:    tokenService,
 		TokenValidator:  tokenService,
+		Notifier:        notifier,
+		OIDCService:     oidcService,
+		TokenCache:      tokenCache,
 	}, nil
 }

@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   backend:
-    image: registry.git.int.sktaurus.ru/daniilsv/buildctl-back:latest
+    image: git.int.sktaurus.ru/daniilsv/buildctl-back:latest
     environment:
       DATABASE_URL: ${DATABASE_URL}
       OIDC_ISSUER: ${OIDC_ISSUER:-}
@@ -24,7 +24,7 @@ services:
       PORT: 8080
 
   frontend:
-    image: registry.git.int.sktaurus.ru/daniilsv/buildctl-front:latest
+    image: git.int.sktaurus.ru/daniilsv/buildctl-front:latest
     ports:
       - "3000:80"
     depends_on:

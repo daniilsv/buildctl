@@ -141,6 +141,15 @@ func (s *ProjectService) GetProjectByName(ctx context.Context, name string) (*pr
 	return toProject(dbProject), nil
 }
 
+func (s *ProjectService) GetProjectByNameDB(ctx context.Context, name string) (*db.Project, error) {
+	dbProject, err := s.queries.GetProjectByName(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("project not found: %w", err)
+	}
+
+	return &dbProject, nil
+}
+
 func toProject(p db.Project) *projects.Project {
 	var settings map[string]interface{}
 	if len(p.Settings) > 0 {
