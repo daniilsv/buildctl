@@ -17,9 +17,9 @@ jobs:
       - name: Notify build started
         run: |
           buildctl event \
-            --token="${{ vars.BUILD_ASSISTANT_TOKEN }}" \
-            --backend="${{ vars.BUILD_ASSISTANT_BACKEND }}" \
-            --project="build-assistant" \
+            --token="${{ vars.BCTL_TOKEN }}" \
+            --backend="${{ vars.BCTL_BACKEND }}" \
+            --project="${{ vars.BCTL_PROJECT_NAME }}" \
             --commit="${{ github.sha }}" \
             --branch="${{ github.ref_name }}" \
             --status="started"
@@ -62,6 +62,18 @@ jobs:
           build-args: |
             BUILDKIT_INLINE_CACHE=1
 
+      - name: Notify build in_progress
+        run: |
+          buildctl event \
+            --token="${{ vars.BCTL_TOKEN }}" \
+            --backend="${{ vars.BCTL_BACKEND }}" \
+            --project="${{ vars.BCTL_PROJECT_NAME }}" \
+            --commit="${{ github.sha }}" \
+            --branch="${{ github.ref_name }}" \
+            --log="Built backend image" \
+            --status="in_progress"
+        continue-on-error: true
+
       - name: Extract metadata for frontend
         id: meta-frontend
         uses: docker/metadata-action@v5
@@ -89,6 +101,18 @@ jobs:
           build-args: |
             BUILDKIT_INLINE_CACHE=1
 
+      - name: Notify build in_progress
+        run: |
+          buildctl event \
+            --token="${{ vars.BCTL_TOKEN }}" \
+            --backend="${{ vars.BCTL_BACKEND }}" \
+            --project="${{ vars.BCTL_PROJECT_NAME }}" \
+            --commit="${{ github.sha }}" \
+            --branch="${{ github.ref_name }}" \
+            --log="Built frontend image" \
+            --status="in_progress"
+        continue-on-error: true
+
       - name: Build CLI for Linux AMD64
         run: |
           cd ./cli
@@ -111,13 +135,25 @@ jobs:
           name: buildctl-linux-arm64
           path: cli/buildctl-linux-arm64
 
+      - name: Notify build in_progress
+        run: |
+          buildctl event \
+            --token="${{ vars.BCTL_TOKEN }}" \
+            --backend="${{ vars.BCTL_BACKEND }}" \
+            --project="${{ vars.BCTL_PROJECT_NAME }}" \
+            --commit="${{ github.sha }}" \
+            --branch="${{ github.ref_name }}" \
+            --log="Built CLI" \
+            --status="in_progress"
+        continue-on-error: true
+
       - name: Notify build success
         if: success()
         run: |
           buildctl event \
-            --token="${{ vars.BUILD_ASSISTANT_TOKEN }}" \
-            --backend="${{ vars.BUILD_ASSISTANT_BACKEND }}" \
-            --project="build-assistant" \
+            --token="${{ vars.BCTL_TOKEN }}" \
+            --backend="${{ vars.BCTL_BACKEND }}" \
+            --project="${{ vars.BCTL_PROJECT_NAME }}" \
             --commit="${{ github.sha }}" \
             --branch="${{ github.ref_name }}" \
             --status="success"
@@ -127,9 +163,9 @@ jobs:
         if: failure()
         run: |
           buildctl event \
-            --token="${{ vars.BUILD_ASSISTANT_TOKEN }}" \
-            --backend="${{ vars.BUILD_ASSISTANT_BACKEND }}" \
-            --project="build-assistant" \
+            --token="${{ vars.BCTL_TOKEN }}" \
+            --backend="${{ vars.BCTL_BACKEND }}" \
+            --project="${{ vars.BCTL_PROJECT_NAME }}" \
             --commit="${{ github.sha }}" \
             --branch="${{ github.ref_name }}" \
             --status="failed"
