@@ -38,14 +38,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Download buildctl
-        run: |
-          wget -O buildctl https://github.com/daniilsv/buildctl/releases/latest/download/buildctl-linux-amd64
-          chmod +x buildctl
-      
       - name: Notify build started
         run: |
-          ./buildctl event \
+          buildctl event \
             --token="${{ secrets.BUILD_ASSISTANT_TOKEN }}" \
             --backend="${{ secrets.BUILD_ASSISTANT_BACKEND }}" \
             --project="my-project" \
@@ -58,11 +53,38 @@ jobs:
           # Ваши команды сборки/тестирования
           npm test
         continue-on-error: true
+
+      - name: Notify build step
+        run: |
+          buildctl event \
+            --token="${{ secrets.BUILD_ASSISTANT_TOKEN }}" \
+            --backend="${{ secrets.BUILD_ASSISTANT_BACKEND }}" \
+            --project="my-project" \
+            --commit="${{ github.sha }}" \
+            --branch="${{ github.ref_name }}" \
+            --status="First service tested"
+
+      - name: Run tests
+        run: |
+          # Ваши команды сборки/тестирования
+          npm build
+        continue-on-error: true
+
+      - name: Upload artifact
+        if: success()
+        run: |
+          buildctl artifact upload \
+            --token="${{ secrets.BUILD_ASSISTANT_TOKEN }}" \
+            --backend="${{ secrets.BUILD_ASSISTANT_BACKEND }}" \
+            --project="my-project" \
+            --branch="${{ github.ref_name }}" \
+            --commit="${{ github.sha }}" \
+            --file="./dist/app.tar.gz"
       
       - name: Notify build success
         if: success()
         run: |
-          ./buildctl event \
+          buildctl event \
             --token="${{ secrets.BUILD_ASSISTANT_TOKEN }}" \
             --backend="${{ secrets.BUILD_ASSISTANT_BACKEND }}" \
             --project="my-project" \
@@ -73,7 +95,7 @@ jobs:
       - name: Notify build failed
         if: failure()
         run: |
-          ./buildctl event \
+          buildctl event \
             --token="${{ secrets.BUILD_ASSISTANT_TOKEN }}" \
             --backend="${{ secrets.BUILD_ASSISTANT_BACKEND }}" \
             --project="my-project" \
@@ -81,16 +103,6 @@ jobs:
             --branch="${{ github.ref_name }}" \
             --status="failed"
       
-      - name: Upload artifact
-        if: success()
-        run: |
-          ./buildctl artifact upload \
-            --token="${{ secrets.BUILD_ASSISTANT_TOKEN }}" \
-            --backend="${{ secrets.BUILD_ASSISTANT_BACKEND }}" \
-            --project="my-project" \
-            --branch="${{ github.ref_name }}" \
-            --commit="${{ github.sha }}" \
-            --file="./dist/app.tar.gz"
 ```
 
 ### Переменные окружения для GitHub Secrets
