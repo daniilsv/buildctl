@@ -32,13 +32,13 @@ type IntrospectionResponse struct {
 }
 
 type OIDCService struct {
-	provider     *oidc.Provider
-	config       oauth2.Config
-	verifier     *oidc.IDTokenVerifier
-	stateStore   map[string]time.Time
+	provider      *oidc.Provider
+	config        oauth2.Config
+	verifier      *oidc.IDTokenVerifier
+	stateStore    map[string]time.Time
 	introspectURL string
-	clientID     string
-	clientSecret string
+	clientID      string
+	clientSecret  string
 }
 
 func NewOIDCService(cfg OIDCConfig) (*OIDCService, error) {
@@ -69,21 +69,22 @@ func NewOIDCService(cfg OIDCConfig) (*OIDCService, error) {
 	if err := provider.Claims(&struct {
 		IntrospectionEndpoint *string `json:"introspection_endpoint"`
 	}{}); err == nil {
+
 		// Try to get from well-known endpoint
-		introspectURL = cfg.Issuer + "/oauth2/introspect"
+		introspectURL = cfg.Issuer + "/oauth/v2/introspect"
 		if !strings.HasSuffix(cfg.Issuer, "/") {
-			introspectURL = cfg.Issuer + "/oauth2/introspect"
+			introspectURL = cfg.Issuer + "/oauth/v2/introspect"
 		}
 	}
 
 	return &OIDCService{
-		provider:     provider,
-		config:       oauth2Config,
-		verifier:     verifier,
-		stateStore:   make(map[string]time.Time),
+		provider:      provider,
+		config:        oauth2Config,
+		verifier:      verifier,
+		stateStore:    make(map[string]time.Time),
 		introspectURL: introspectURL,
-		clientID:     cfg.ClientID,
-		clientSecret: cfg.ClientSecret,
+		clientID:      cfg.ClientID,
+		clientSecret:  cfg.ClientSecret,
 	}, nil
 }
 
