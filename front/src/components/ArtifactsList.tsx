@@ -1,7 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FileText, Package, Trash2 } from "lucide-react";
+import { FileText, Package, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { deleteArtifact, deleteBuildArtifacts, getBuildArtifacts, type Artifact } from "../api";
+import {
+  deleteArtifact,
+  deleteBuildArtifacts,
+  getBuildArtifacts,
+  type Artifact,
+} from "../api";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -11,14 +16,6 @@ import {
   CardTitle,
 } from "./ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "./ui/table";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -26,6 +23,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
 
 interface ArtifactsListProps {
   buildId: string;
@@ -84,7 +89,8 @@ export default function ArtifactsList({ buildId }: ArtifactsListProps) {
     if (artifact.artifact_type === "container_image") {
       const parts = [];
       if (artifact.image_tag) parts.push(artifact.image_tag);
-      if (artifact.image_digest) parts.push(artifact.image_digest.substring(0, 12));
+      if (artifact.image_digest)
+        parts.push(artifact.image_digest.substring(0, 12));
       return parts.join(" • ");
     }
     return formatBytes(artifact.size_bytes);
@@ -110,7 +116,9 @@ export default function ArtifactsList({ buildId }: ArtifactsListProps) {
           <CardTitle>Build Artifacts</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">No artifacts available</p>
+          <p className="text-sm text-muted-foreground">
+            No artifacts available
+          </p>
         </CardContent>
       </Card>
     );
@@ -171,7 +179,6 @@ export default function ArtifactsList({ buildId }: ArtifactsListProps) {
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          <Download className="h-4 w-4 mr-2" />
                           Download
                         </a>
                       </Button>
@@ -213,7 +220,10 @@ export default function ArtifactsList({ buildId }: ArtifactsListProps) {
       </Dialog>
 
       {deleteArtifactId && (
-        <Dialog open={!!deleteArtifactId} onOpenChange={() => setDeleteArtifactId(null)}>
+        <Dialog
+          open={!!deleteArtifactId}
+          onOpenChange={() => setDeleteArtifactId(null)}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Delete Artifact</DialogTitle>

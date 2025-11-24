@@ -61,7 +61,7 @@ export default function BuildDetail() {
                 Commit: {build.commit_hash.substring(0, 8)}
               </CardDescription>
               {build.commit_message && (
-                <CardDescription className="mt-2">
+                <CardDescription className="mt-2 break-words max-w-3xl">
                   {build.commit_message}
                 </CardDescription>
               )}

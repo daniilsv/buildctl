@@ -76,8 +76,8 @@ export default function Dashboard() {
               <Card className="hover:shadow-lg transition-shadow">
                 <CardContent className="pt-6">
                   <div className="space-y-2">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex-1 min-w-0">
                         {build.project_name && (
                           <div className="font-semibold">{build.project_name}</div>
                         )}
@@ -85,10 +85,15 @@ export default function Dashboard() {
                           <div className="text-sm text-muted-foreground">Branch: {build.branch_name}</div>
                         )}
                         {build.commit_message && (
-                          <div className="text-sm mt-1 truncate">{build.commit_message}</div>
+                          <div className="text-sm mt-1 truncate max-w-md">{build.commit_message}</div>
                         )}
                       </div>
-                      {getStatusBadge(build.status)}
+                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        {getStatusBadge(build.status)}
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(build.started_at).toLocaleDateString()}
+                        </div>
+                      </div>
                     </div>
                     <div className="text-xs text-muted-foreground font-mono">
                       {build.commit_hash.substring(0, 8)}
