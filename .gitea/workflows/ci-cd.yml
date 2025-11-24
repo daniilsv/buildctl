@@ -49,6 +49,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push backend image
+        id: build-backend
         uses: docker/build-push-action@v5
         with:
           context: ./back
@@ -61,6 +62,21 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+
+      - name: Register backend container
+        if: success()
+        run: |
+          IMAGE_NAME="${{ env.GIT_DOMAIN }}/daniilsv/buildctl-back:${{ github.ref_name }}"
+          DIGEST="${{ steps.build-backend.outputs.digest }}"
+          buildctl container register \
+            --token="${{ vars.BCTL_TOKEN }}" \
+            --backend="${{ vars.BCTL_BACKEND }}" \
+            --project="${{ vars.BCTL_PROJECT_NAME }}" \
+            --branch="${{ github.ref_name }}" \
+            --commit="${{ github.sha }}" \
+            --image="$IMAGE_NAME" \
+            --digest="$DIGEST"
+        continue-on-error: true
 
       - name: Notify build in_progress
         run: |
@@ -88,6 +104,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push frontend image
+        id: build-frontend
         uses: docker/build-push-action@v5
         with:
           context: ./front
@@ -100,6 +117,21 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+
+      - name: Register frontend container
+        if: success()
+        run: |
+          IMAGE_NAME="${{ env.GIT_DOMAIN }}/daniilsv/buildctl-front:${{ github.ref_name }}"
+          DIGEST="${{ steps.build-frontend.outputs.digest }}"
+          buildctl container register \
+            --token="${{ vars.BCTL_TOKEN }}" \
+            --backend="${{ vars.BCTL_BACKEND }}" \
+            --project="${{ vars.BCTL_PROJECT_NAME }}" \
+            --branch="${{ github.ref_name }}" \
+            --commit="${{ github.sha }}" \
+            --image="$IMAGE_NAME" \
+            --digest="$DIGEST"
+        continue-on-error: true
 
       - name: Notify build in_progress
         run: |
@@ -118,22 +150,23 @@ jobs:
           cd ./cli
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o buildctl-linux-amd64 ./cmd/buildctl
 
-      - name: Build CLI for Linux ARM64
-        run: |
-          cd ./cli
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o buildctl-linux-arm64 ./cmd/buildctl
-
       - name: Upload CLI artifact
         uses: https://github.com/christopherHX/gitea-upload-artifact@v4
         with:
           name: buildctl-linux-amd64
           path: cli/buildctl-linux-amd64
 
-      - name: Upload CLI artifact
-        uses: https://github.com/christopherHX/gitea-upload-artifact@v4
-        with:
-          name: buildctl-linux-arm64
-          path: cli/buildctl-linux-arm64
+      - name: Upload CLI artifact to build assistant (AMD64)
+        if: success()
+        run: |
+          buildctl artifact upload \
+            --token="${{ vars.BCTL_TOKEN }}" \
+            --backend="${{ vars.BCTL_BACKEND }}" \
+            --project="${{ vars.BCTL_PROJECT_NAME }}" \
+            --branch="${{ github.ref_name }}" \
+            --commit="${{ github.sha }}" \
+            --file="./cli/buildctl-linux-amd64"
+        continue-on-error: true
 
       - name: Notify build in_progress
         run: |
