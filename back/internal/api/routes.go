@@ -32,6 +32,7 @@ func NewRouter(h *handlers.Handlers) chi.Router {
 			r.Post("/presign", h.Artifacts.Presign)
 			r.Post("/confirm", h.Artifacts.ConfirmUpload)
 			r.Post("/container", h.Artifacts.RegisterContainer)
+			r.Delete("/{id}", h.Artifacts.DeleteArtifact)
 		})
 
 		r.Route("/auth", func(r chi.Router) {
@@ -67,10 +68,6 @@ func NewRouter(h *handlers.Handlers) chi.Router {
 				r.Delete("/{id}/artifacts", h.Artifacts.DeleteBuildArtifacts)
 			})
 
-			r.Route("/artifacts", func(r chi.Router) {
-				r.Delete("/{id}", h.Artifacts.DeleteArtifact)
-			})
-
 			r.Route("/tokens", func(r chi.Router) {
 				r.Get("/", h.Tokens.List)
 				r.Post("/", h.Tokens.Create)
@@ -81,7 +78,7 @@ func NewRouter(h *handlers.Handlers) chi.Router {
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	return r

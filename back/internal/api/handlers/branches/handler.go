@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"log/slog"
-	"github.com/google/uuid"
-	"github.com/build-assistant/back/internal/notifications"
+
 	db "github.com/build-assistant/back/db/gen"
+	"github.com/build-assistant/back/internal/notifications"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 type Service interface {
@@ -23,14 +24,14 @@ type Service interface {
 }
 
 type Build struct {
-	ID          string `json:"id"`
-	ProjectID   string `json:"project_id"`
-	BranchID    string `json:"branch_id"`
-	CommitHash  string `json:"commit_hash"`
-	Status      string `json:"status"`
-	StartedAt   string `json:"started_at"`
-	FinishedAt  string `json:"finished_at,omitempty"`
-	CreatedAt   string `json:"created_at"`
+	ID         string `json:"id"`
+	ProjectID  string `json:"project_id"`
+	BranchID   string `json:"branch_id"`
+	CommitHash string `json:"commit_hash"`
+	Status     string `json:"status"`
+	StartedAt  string `json:"started_at"`
+	FinishedAt string `json:"finished_at,omitempty"`
+	CreatedAt  string `json:"created_at"`
 }
 
 type UpdateBranchRequest struct {
@@ -38,13 +39,13 @@ type UpdateBranchRequest struct {
 }
 
 type Branch struct {
-	ID                    string                 `json:"id"`
-	ProjectID             string                 `json:"project_id"`
-	Name                  string                 `json:"name"`
-	LastSuccessfulCommit  string                 `json:"last_successful_commit,omitempty"`
-	LastSuccessfulAt      string                 `json:"last_successful_at,omitempty"`
-	Settings              map[string]interface{} `json:"settings"`
-	CreatedAt             string                 `json:"created_at"`
+	ID                   string                 `json:"id"`
+	ProjectID            string                 `json:"project_id"`
+	Name                 string                 `json:"name"`
+	LastSuccessfulCommit string                 `json:"last_successful_commit,omitempty"`
+	LastSuccessfulAt     string                 `json:"last_successful_at,omitempty"`
+	Settings             map[string]interface{} `json:"settings"`
+	CreatedAt            string                 `json:"created_at"`
 }
 
 type CreateBranchRequest struct {
@@ -77,7 +78,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(branch)
+	_ = json.NewEncoder(w).Encode(branch)
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +91,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(branches)
+	_ = json.NewEncoder(w).Encode(branches)
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -104,7 +105,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(branch)
+	_ = json.NewEncoder(w).Encode(branch)
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +125,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(branch)
+	_ = json.NewEncoder(w).Encode(branch)
 }
 
 func (h *Handler) GetBuilds(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +139,7 @@ func (h *Handler) GetBuilds(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(builds)
+	_ = json.NewEncoder(w).Encode(builds)
 }
 
 func (h *Handler) TestTelegramNotification(w http.ResponseWriter, r *http.Request) {
@@ -180,7 +181,7 @@ func (h *Handler) TestTelegramNotification(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Test notification sent"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Test notification sent"})
 }
 
 func (h *Handler) TestWebhook(w http.ResponseWriter, r *http.Request) {
@@ -221,6 +222,5 @@ func (h *Handler) TestWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Test webhook sent"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Test webhook sent"})
 }
-
