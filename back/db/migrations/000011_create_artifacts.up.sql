@@ -21,10 +21,7 @@ CREATE TABLE artifacts (
   image_digest TEXT,
 
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  deleted_at TIMESTAMP,
-
-  CONSTRAINT artifacts_build_id_fkey FOREIGN KEY (build_id) REFERENCES builds(id) ON DELETE CASCADE,
-  CONSTRAINT artifacts_log_id_fkey FOREIGN KEY (log_id) REFERENCES build_logs(id) ON DELETE SET NULL
+  deleted_at TIMESTAMP
 );
 
 CREATE INDEX idx_artifacts_build_id ON artifacts(build_id);
