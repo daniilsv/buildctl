@@ -140,13 +140,36 @@ func runContainerRegister(cmd *cobra.Command, args []string) error {
 		sizeBytes = &size
 	}
 
+	// Парсим имя образа и тег
+	// Ищем последний ':' который не является частью порта (registry:port)
+	imageName := containerImage
+	imageTag := "latest"
+	
+	// Ищем последний ':' после последнего '/'
+	lastSlash := -1
+	for i := len(containerImage) - 1; i >= 0; i-- {
+		if containerImage[i] == '/' {
+			lastSlash = i
+			break
+		}
+	}
+	
+	// Ищем ':' после последнего '/'
+	for i := len(containerImage) - 1; i > lastSlash; i-- {
+		if containerImage[i] == ':' {
+			imageName = containerImage[:i]
+			imageTag = containerImage[i+1:]
+			break
+		}
+	}
+
 	// Регистрируем образ в системе
 	registerReq := map[string]interface{}{
 		"project_name": containerProject,
 		"branch_name":  containerBranch,
 		"commit_hash":  containerCommit,
-		"image_name":   containerImage,
-		"image_tag":    containerImage, // Полный путь с тегом
+		"image_name":   imageName,
+		"image_tag":    imageTag,
 		"image_digest": containerDigest,
 	}
 

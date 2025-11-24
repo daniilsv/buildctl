@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	db "github.com/build-assistant/back/db/gen"
@@ -149,7 +150,15 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 				imageName, _ := artMap["image_name"].(string)
 				imageTag, _ := artMap["image_tag"].(string)
 				imageDigest, _ := artMap["image_digest"].(string)
-				containerImages = append(containerImages, fmt.Sprintf("%s:%s (%s)", imageName, imageTag, imageDigest[:12]))
+				// Если imageTag уже содержит полное имя образа (старый формат), используем его
+				// Иначе формируем imageName:imageTag
+				var imageStr string
+				if imageTag == imageName || strings.Contains(imageTag, "/") {
+					imageStr = imageTag
+				} else {
+					imageStr = imageName + ":" + imageTag
+				}
+				containerImages = append(containerImages, fmt.Sprintf("%s (%s)", imageStr, imageDigest[:12]))
 			}
 		}
 	}

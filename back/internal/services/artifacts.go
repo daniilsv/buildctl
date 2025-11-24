@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	db "github.com/build-assistant/back/db/gen"
 	"github.com/build-assistant/back/internal/api/handlers/artifacts"
@@ -62,8 +63,63 @@ func (s *ArtifactService) PresignUpload(ctx context.Context, projectName, branch
 }
 
 type ArtifactWithURL struct {
-	db.Artifact
-	PublicURL string `json:"public_url"`
+	ID           string  `json:"id"`
+	BuildID      string  `json:"build_id"`
+	LogID        *string `json:"log_id,omitempty"`
+	ProjectID    string  `json:"project_id"`
+	BranchID     string  `json:"branch_id"`
+	CommitHash   string  `json:"commit_hash"`
+	Filename     string  `json:"filename"`
+	S3Key        string  `json:"s3_key"`
+	SizeBytes    int64   `json:"size_bytes"`
+	ContentType  *string `json:"content_type,omitempty"`
+	ArtifactType string  `json:"artifact_type"`
+	ImageName    *string `json:"image_name,omitempty"`
+	ImageTag     *string `json:"image_tag,omitempty"`
+	ImageDigest  *string `json:"image_digest,omitempty"`
+	CreatedAt    string  `json:"created_at"`
+	DeletedAt    *string `json:"deleted_at,omitempty"`
+	PublicURL    string  `json:"public_url"`
+}
+
+// convertArtifact converts db.Artifact to ArtifactWithURL
+func convertArtifact(artifact db.Artifact, publicURL string) ArtifactWithURL {
+	var logID *string
+	if artifact.LogID.Valid {
+		logIDStr := uuid.UUID(artifact.LogID.Bytes).String()
+		logID = &logIDStr
+	}
+
+	var deletedAt *string
+	if artifact.DeletedAt.Valid {
+		deletedAtStr := artifact.DeletedAt.Time.Format("2006-01-02T15:04:05.999999Z07:00")
+		deletedAt = &deletedAtStr
+	}
+
+	createdAt := ""
+	if artifact.CreatedAt.Valid {
+		createdAt = artifact.CreatedAt.Time.Format("2006-01-02T15:04:05.999999Z07:00")
+	}
+
+	return ArtifactWithURL{
+		ID:           artifact.ID.String(),
+		BuildID:      artifact.BuildID.String(),
+		LogID:        logID,
+		ProjectID:    artifact.ProjectID.String(),
+		BranchID:     artifact.BranchID.String(),
+		CommitHash:   artifact.CommitHash,
+		Filename:     artifact.Filename,
+		S3Key:        artifact.S3Key,
+		SizeBytes:    artifact.SizeBytes,
+		ContentType:  artifact.ContentType,
+		ArtifactType: artifact.ArtifactType,
+		ImageName:    artifact.ImageName,
+		ImageTag:     artifact.ImageTag,
+		ImageDigest:  artifact.ImageDigest,
+		CreatedAt:    createdAt,
+		DeletedAt:    deletedAt,
+		PublicURL:    publicURL,
+	}
 }
 
 func (s *ArtifactService) CreateArtifact(ctx context.Context, buildID uuid.UUID, logID *uuid.UUID, filename, s3Key string, sizeBytes int64, contentType *string) (any, error) {
@@ -99,10 +155,8 @@ func (s *ArtifactService) CreateArtifact(ctx context.Context, buildID uuid.UUID,
 		return nil, fmt.Errorf("failed to create artifact: %w", err)
 	}
 
-	return &ArtifactWithURL{
-		Artifact:  artifact,
-		PublicURL: s.publicPrefix + s3Key,
-	}, nil
+	result := convertArtifact(artifact, s.publicPrefix+s3Key)
+	return &result, nil
 }
 
 func (s *ArtifactService) CreateContainerImage(ctx context.Context, buildID uuid.UUID, logID *uuid.UUID, imageName, imageTag, imageDigest string, filename *string, s3Key *string, sizeBytes *int64) (any, error) {
@@ -119,9 +173,17 @@ func (s *ArtifactService) CreateContainerImage(ctx context.Context, buildID uuid
 		}
 	}
 
-	filenameStr := imageName + ":" + imageTag
+	var filenameStr string
 	if filename != nil {
 		filenameStr = *filename
+	} else {
+		// Если imageTag уже содержит полное имя образа (старый формат с '/' или равен imageName),
+		// используем его. Иначе формируем imageName:imageTag
+		if imageTag == imageName || strings.Contains(imageTag, "/") {
+			filenameStr = imageTag
+		} else {
+			filenameStr = imageName + ":" + imageTag
+		}
 	}
 
 	s3KeyStr := ""
@@ -158,10 +220,8 @@ func (s *ArtifactService) CreateContainerImage(ctx context.Context, buildID uuid
 		publicURL = s.publicPrefix + *s3Key
 	}
 
-	return &ArtifactWithURL{
-		Artifact:  artifact,
-		PublicURL: publicURL,
-	}, nil
+	result := convertArtifact(artifact, publicURL)
+	return &result, nil
 }
 
 func (s *ArtifactService) GetBuildArtifacts(ctx context.Context, buildID uuid.UUID) (any, error) {
@@ -180,10 +240,7 @@ func (s *ArtifactService) getBuildArtifactsInternal(ctx context.Context, buildID
 		if artifact.S3Key != "" {
 			publicURL = s.publicPrefix + artifact.S3Key
 		}
-		result[i] = ArtifactWithURL{
-			Artifact:  artifact,
-			PublicURL: publicURL,
-		}
+		result[i] = convertArtifact(artifact, publicURL)
 	}
 
 	return result, nil
@@ -199,7 +256,7 @@ func (s *ArtifactService) GetBuildArtifactsAsInterface(ctx context.Context, buil
 	result := make([]interface{}, len(artifacts))
 	for i, artifact := range artifacts {
 		artMap := map[string]interface{}{
-			"id":            artifact.ID.String(),
+			"id":            artifact.ID,
 			"artifact_type": artifact.ArtifactType,
 			"filename":      artifact.Filename,
 			"public_url":    artifact.PublicURL,
