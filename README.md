@@ -13,9 +13,14 @@
 ## Функциональность
 
 - Отслеживание сборок по проектам и веткам
-- Хранение логов сборок и артефактов в S3
+- Хранение логов сборок в БД
+- Управление артефактами сборок:
+  - Загрузка файловых артефактов в S3 с публичными URL
+  - Регистрация образов контейнеров с тегами и дайджестами
+  - Просмотр и скачивание артефактов в веб-интерфейсе
+  - Удаление артефактов (отдельных или всех для сборки)
 - AI-анализ коммитов с генерацией описаний на русском языке
-- Уведомления в Telegram о статусе сборок
+- Уведомления в Telegram о статусе сборок с информацией об артефактах
 - OIDC аутентификация для веб-интерфейса
 - REST API для интеграции с внешними системами
 
@@ -80,6 +85,22 @@ jobs:
             --branch="${{ github.ref_name }}" \
             --commit="${{ github.sha }}" \
             --file="./dist/app.tar.gz"
+
+      - name: Build and push Docker image
+        if: success()
+        run: |
+          docker build -t registry.example.com/my-project:${{ github.sha }} .
+          docker push registry.example.com/my-project:${{ github.sha }}
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' registry.example.com/my-project:${{ github.sha }} | cut -d'@' -f2)
+
+          buildctl container register \
+            --token="${{ secrets.BUILD_ASSISTANT_TOKEN }}" \
+            --backend="${{ secrets.BUILD_ASSISTANT_BACKEND }}" \
+            --project="my-project" \
+            --branch="${{ github.ref_name }}" \
+            --commit="${{ github.sha }}" \
+            --image="registry.example.com/my-project:${{ github.sha }}" \
+            --digest="$DIGEST"
       
       - name: Notify build success
         if: success()
@@ -201,7 +222,9 @@ buildctl event \
   --log="Optional log message"
 ```
 
-### Загрузка артефакта
+### Загрузка файлового артефакта
+
+Загружает файл в S3 и регистрирует его в системе:
 
 ```bash
 buildctl artifact upload \
@@ -210,6 +233,148 @@ buildctl artifact upload \
   --project="project-name" \
   --branch="main" \
   --commit="abc123" \
-  --file="./path/to/artifact.tar.gz"
+  --file="./dist/app.tar.gz"
+```
+
+После загрузки артефакт будет доступен в веб-интерфейсе с публичной ссылкой для скачивания.
+
+### Регистрация образа контейнера
+
+Регистрирует образ контейнера в системе (опционально с загрузкой tar архива):
+
+```bash
+# Регистрация образа без файла
+buildctl container register \
+  --token="your-token" \
+  --backend="https://backend.example.com" \
+  --project="project-name" \
+  --branch="main" \
+  --commit="abc123" \
+  --image="registry.example.com/myapp:v1.0.0" \
+  --digest="sha256:abc123..."
+
+# Регистрация образа с загрузкой tar архива
+buildctl container register \
+  --token="your-token" \
+  --backend="https://backend.example.com" \
+  --project="project-name" \
+  --branch="main" \
+  --commit="abc123" \
+  --image="registry.example.com/myapp:v1.0.0" \
+  --digest="sha256:abc123..." \
+  --file="./image.tar"
+```
+
+Образы контейнеров отображаются отдельно от файловых артефактов в веб-интерфейсе.
+
+## API Endpoints для артефактов
+
+### Получение presigned URL для загрузки
+
+```http
+POST /api/v1/artifacts/presign
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "project_name": "my-project",
+  "branch_name": "main",
+  "commit_hash": "abc123",
+  "filename": "app.tar.gz"
+}
+```
+
+Ответ:
+```json
+{
+  "upload_url": "https://s3.example.com/...",
+  "s3_key": "builds/abc123/app.tar.gz"
+}
+```
+
+### Подтверждение загрузки файлового артефакта
+
+```http
+POST /api/v1/artifacts/confirm
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "project_name": "my-project",
+  "branch_name": "main",
+  "commit_hash": "abc123",
+  "s3_key": "builds/abc123/app.tar.gz",
+  "filename": "app.tar.gz",
+  "size_bytes": 1024000,
+  "content_type": "application/gzip",
+  "log_id": "optional-log-uuid"
+}
+```
+
+### Регистрация образа контейнера
+
+```http
+POST /api/v1/artifacts/container
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "project_name": "my-project",
+  "branch_name": "main",
+  "commit_hash": "abc123",
+  "image_name": "registry.example.com/myapp:v1.0.0",
+  "image_tag": "v1.0.0",
+  "image_digest": "sha256:abc123...",
+  "filename": "optional-image.tar",
+  "s3_key": "optional-s3-key",
+  "size_bytes": 50000000,
+  "log_id": "optional-log-uuid"
+}
+```
+
+### Получение артефактов сборки
+
+```http
+GET /api/v1/builds/{build_id}/artifacts
+Authorization: Bearer <token>
+```
+
+Ответ:
+```json
+[
+  {
+    "id": "uuid",
+    "build_id": "uuid",
+    "artifact_type": "file",
+    "filename": "app.tar.gz",
+    "size_bytes": 1024000,
+    "content_type": "application/gzip",
+    "public_url": "https://cdn.example.com/builds/abc123/app.tar.gz",
+    "created_at": "2025-01-01T12:00:00Z"
+  },
+  {
+    "id": "uuid",
+    "build_id": "uuid",
+    "artifact_type": "container_image",
+    "image_name": "registry.example.com/myapp:v1.0.0",
+    "image_tag": "v1.0.0",
+    "image_digest": "sha256:abc123...",
+    "created_at": "2025-01-01T12:05:00Z"
+  }
+]
+```
+
+### Удаление артефакта
+
+```http
+DELETE /api/v1/artifacts/{artifact_id}
+Authorization: Bearer <token>
+```
+
+### Удаление всех артефактов сборки
+
+```http
+DELETE /api/v1/builds/{build_id}/artifacts
+Authorization: Bearer <token>
 ```
 

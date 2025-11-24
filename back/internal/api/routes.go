@@ -30,6 +30,8 @@ func NewRouter(h *handlers.Handlers) chi.Router {
 		r.Route("/artifacts", func(r chi.Router) {
 			r.Use(middleware.TokenAuth(h.Artifacts.TokenValidator))
 			r.Post("/presign", h.Artifacts.Presign)
+			r.Post("/confirm", h.Artifacts.ConfirmUpload)
+			r.Post("/container", h.Artifacts.RegisterContainer)
 		})
 
 		r.Route("/auth", func(r chi.Router) {
@@ -61,6 +63,12 @@ func NewRouter(h *handlers.Handlers) chi.Router {
 			r.Route("/builds", func(r chi.Router) {
 				r.Get("/", h.Builds.List)
 				r.Get("/{id}", h.Builds.Get)
+				r.Get("/{id}/artifacts", h.Artifacts.GetBuildArtifacts)
+				r.Delete("/{id}/artifacts", h.Artifacts.DeleteBuildArtifacts)
+			})
+
+			r.Route("/artifacts", func(r chi.Router) {
+				r.Delete("/{id}", h.Artifacts.DeleteArtifact)
 			})
 
 			r.Route("/tokens", func(r chi.Router) {

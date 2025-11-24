@@ -148,6 +148,36 @@ func (s *BuildService) ListBuilds(ctx context.Context, projectIDOrName, branchID
 	return result, nil
 }
 
+func (s *BuildService) GetBuildByProjectBranchCommit(ctx context.Context, projectName, branchName, commitHash string) (map[string]interface{}, error) {
+	project, err := s.queries.GetProjectByName(ctx, projectName)
+	if err != nil {
+		return nil, fmt.Errorf("project not found: %w", err)
+	}
+
+	branch, err := s.queries.GetBranchByProjectAndName(ctx, &db.GetBranchByProjectAndNameParams{
+		ProjectID: project.ID,
+		Name:      branchName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("branch not found: %w", err)
+	}
+
+	dbBuild, err := s.queries.GetBuildByProjectBranchCommit(ctx, &db.GetBuildByProjectBranchCommitParams{
+		ProjectID:  project.ID,
+		BranchID:   branch.ID,
+		CommitHash: commitHash,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("build not found: %w", err)
+	}
+
+	return map[string]interface{}{
+		"id":         dbBuild.ID.String(),
+		"project_id": dbBuild.ProjectID.String(),
+		"branch_id":  dbBuild.BranchID.String(),
+	}, nil
+}
+
 func toBuild(b db.Build, project *db.Project, branch *db.Branch) *builds.Build {
 	build := &builds.Build{
 		ID:          b.ID.String(),

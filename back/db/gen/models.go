@@ -18,6 +18,25 @@ type AccessToken struct {
 	ExpiresAt  pgtype.Timestamp
 }
 
+type Artifact struct {
+	ID           uuid.UUID
+	BuildID      uuid.UUID
+	LogID        pgtype.UUID
+	ProjectID    uuid.UUID
+	BranchID     uuid.UUID
+	CommitHash   string
+	Filename     string
+	S3Key        string
+	SizeBytes    int64
+	ContentType  *string
+	ArtifactType string
+	ImageName    *string
+	ImageTag     *string
+	ImageDigest  *string
+	CreatedAt    pgtype.Timestamp
+	DeletedAt    pgtype.Timestamp
+}
+
 type Branch struct {
 	ID                   uuid.UUID
 	ProjectID            uuid.UUID

@@ -91,6 +91,78 @@ func (n *TelegramNotifier) SendBuildNotification(ctx context.Context, project *d
 	return nil
 }
 
+func (n *TelegramNotifier) SendBuildNotificationWithArtifacts(ctx context.Context, project *db.Project, branch *db.Branch, commitHash, summary string, artifactURLs []string, containerImages []string) error {
+	var projectSettings map[string]interface{}
+	if err := json.Unmarshal(project.Settings, &projectSettings); err != nil {
+		return fmt.Errorf("failed to parse project settings: %w", err)
+	}
+
+	var branchSettings map[string]interface{}
+	if err := json.Unmarshal(branch.Settings, &branchSettings); err != nil {
+		return fmt.Errorf("failed to parse branch settings: %w", err)
+	}
+
+	var notifications []map[string]interface{}
+	if branchNotifications, ok := branchSettings["telegram_notifications"].([]interface{}); ok && len(branchNotifications) > 0 {
+		for _, notif := range branchNotifications {
+			if notifMap, ok := notif.(map[string]interface{}); ok {
+				notifications = append(notifications, notifMap)
+			}
+		}
+	} else if projectNotifications, ok := projectSettings["telegram_notifications"].([]interface{}); ok && len(projectNotifications) > 0 {
+		for _, notif := range projectNotifications {
+			if notifMap, ok := notif.(map[string]interface{}); ok {
+				notifications = append(notifications, notifMap)
+			}
+		}
+	}
+
+	if len(notifications) == 0 {
+		return nil
+	}
+
+	projectTitle := project.Title
+	if projectTitle == "" {
+		projectTitle = project.Name
+	}
+
+	message := fmt.Sprintf("🎉 Сборка завершена: [Проект: %s]\n\nВетка: %s\nКоммит: %s\n\n📝 Изменения:\n%s\n", projectTitle, branch.Name, commitHash[:8], summary)
+
+	if len(artifactURLs) > 0 {
+		message += "\n📦 Файловые артефакты:\n"
+		for _, url := range artifactURLs {
+			message += fmt.Sprintf("• %s\n", url)
+		}
+	}
+
+	if len(containerImages) > 0 {
+		message += "\n🐳 Контейнерные образы:\n"
+		for _, image := range containerImages {
+			message += fmt.Sprintf("• %s\n", image)
+		}
+	}
+
+	for _, notif := range notifications {
+		chatID := notif["chat_id"]
+		if chatID == nil {
+			continue
+		}
+		chatIDStr := fmt.Sprintf("%v", chatID)
+
+		var threadID *string
+		if threadIDVal, ok := notif["thread_id"]; ok && threadIDVal != nil {
+			threadIDStr := fmt.Sprintf("%v", threadIDVal)
+			threadID = &threadIDStr
+		}
+
+		if err := n.sendMessage(ctx, chatIDStr, message, threadID); err != nil {
+			return fmt.Errorf("failed to send to chat %s: %w", chatIDStr, err)
+		}
+	}
+
+	return nil
+}
+
 func (n *TelegramNotifier) SendFailedBuildNotification(ctx context.Context, project *db.Project, branch *db.Branch, commitHash, errorMessage string) error {
 	var projectSettings map[string]interface{}
 	if err := json.Unmarshal(project.Settings, &projectSettings); err != nil {

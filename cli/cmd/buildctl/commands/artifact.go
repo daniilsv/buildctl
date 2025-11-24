@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -121,7 +123,56 @@ func runArtifactUpload(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("upload failed with status %d: %s", uploadResp.StatusCode, string(body))
 	}
 
-	fmt.Printf("Artifact uploaded successfully: %s\n", presignResp.S3Key)
+	// Подтверждение загрузки на backend
+	contentType := mime.TypeByExtension(filepath.Ext(filename))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	confirmReq := map[string]interface{}{
+		"project_name": artifactProject,
+		"branch_name":  artifactBranch,
+		"commit_hash":  artifactCommit,
+		"s3_key":       presignResp.S3Key,
+		"filename":     filename,
+		"size_bytes":   fileInfo.Size(),
+		"content_type": contentType,
+	}
+
+	confirmPayload, err := json.Marshal(confirmReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal confirm request: %w", err)
+	}
+
+	confirmURL := artifactBackend + "/api/v1/artifacts/confirm"
+	confirmHTTPReq, err := http.NewRequest("POST", confirmURL, bytes.NewBuffer(confirmPayload))
+	if err != nil {
+		return fmt.Errorf("failed to create confirm request: %w", err)
+	}
+
+	confirmHTTPReq.Header.Set("Content-Type", "application/json")
+	confirmHTTPReq.Header.Set("Authorization", "Bearer "+artifactToken)
+
+	confirmResp, err := client.Do(confirmHTTPReq)
+	if err != nil {
+		return fmt.Errorf("failed to confirm upload: %w", err)
+	}
+	defer confirmResp.Body.Close()
+
+	if confirmResp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(confirmResp.Body)
+		return fmt.Errorf("confirm request failed with status %d: %s", confirmResp.StatusCode, string(body))
+	}
+
+	var confirmResult struct {
+		PublicURL string `json:"public_url"`
+	}
+	if err := json.NewDecoder(confirmResp.Body).Decode(&confirmResult); err == nil && confirmResult.PublicURL != "" {
+		fmt.Printf("Artifact uploaded successfully!\nS3 Key: %s\nPublic URL: %s\n", presignResp.S3Key, confirmResult.PublicURL)
+	} else {
+		fmt.Printf("Artifact uploaded successfully: %s\n", presignResp.S3Key)
+	}
+
 	return nil
 }
 

@@ -13,19 +13,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type Processor struct {
-	queries   *db.Queries
-	gitClient git.Client
-	aiClient  ai.Client
-	notifier  notifications.Notifier
+type ArtifactService interface {
+	GetBuildArtifactsAsInterface(ctx context.Context, buildID uuid.UUID) ([]interface{}, error)
 }
 
-func NewProcessor(queries *db.Queries, gitClient git.Client, aiClient ai.Client, notifier notifications.Notifier) *Processor {
+type Processor struct {
+	queries         *db.Queries
+	gitClient       git.Client
+	aiClient        ai.Client
+	notifier        notifications.Notifier
+	artifactService ArtifactService
+}
+
+func NewProcessor(queries *db.Queries, gitClient git.Client, aiClient ai.Client, notifier notifications.Notifier, artifactService ArtifactService) *Processor {
 	return &Processor{
-		queries:   queries,
-		gitClient: gitClient,
-		aiClient:  aiClient,
-		notifier:  notifier,
+		queries:         queries,
+		gitClient:       gitClient,
+		aiClient:        aiClient,
+		notifier:        notifier,
+		artifactService: artifactService,
 	}
 }
 
@@ -121,19 +127,35 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 		return fmt.Errorf("build not found: %w", err)
 	}
 
-	logs, err := p.queries.GetBuildLogsByBuildID(ctx, buildUUID)
+	// Загружаем артефакты из новой таблицы
+	artifacts, err := p.artifactService.GetBuildArtifactsAsInterface(ctx, buildUUID)
 	if err != nil {
-		return fmt.Errorf("failed to get logs: %w", err)
+		return fmt.Errorf("failed to get artifacts: %w", err)
 	}
 
+	// Собираем информацию об артефактах
 	var artifactURLs []string
-	for _, log := range logs {
-		if log.ArtifactUrl != nil {
-			artifactURLs = append(artifactURLs, *log.ArtifactUrl)
+	var containerImages []string
+
+	for _, artifact := range artifacts {
+		if artMap, ok := artifact.(map[string]interface{}); ok {
+			artifactType, _ := artMap["artifact_type"].(string)
+			publicURL, _ := artMap["public_url"].(string)
+
+			if artifactType == "file" && publicURL != "" {
+				filename, _ := artMap["filename"].(string)
+				artifactURLs = append(artifactURLs, fmt.Sprintf("%s - %s", filename, publicURL))
+			} else if artifactType == "container_image" {
+				imageName, _ := artMap["image_name"].(string)
+				imageTag, _ := artMap["image_tag"].(string)
+				imageDigest, _ := artMap["image_digest"].(string)
+				containerImages = append(containerImages, fmt.Sprintf("%s:%s (%s)", imageName, imageTag, imageDigest[:12]))
+			}
 		}
 	}
 
-	if err := p.notifier.SendBuildNotification(ctx, &project, &branch, commitHash, summary, artifactURLs); err != nil {
+	// Отправляем уведомление с артефактами и образами
+	if err := p.notifier.SendBuildNotificationWithArtifacts(ctx, &project, &branch, commitHash, summary, artifactURLs, containerImages); err != nil {
 		return fmt.Errorf("failed to send notification: %w", err)
 	}
 

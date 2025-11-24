@@ -24,6 +24,25 @@ export interface Log {
   created_at: string
 }
 
+export interface Artifact {
+  id: string
+  build_id: string
+  log_id?: string
+  project_id: string
+  branch_id: string
+  commit_hash: string
+  filename: string
+  s3_key: string
+  size_bytes: number
+  content_type?: string
+  artifact_type: 'file' | 'container_image'
+  image_name?: string
+  image_tag?: string
+  image_digest?: string
+  created_at: string
+  public_url: string
+}
+
 // Helper to check if string is UUID
 const isUUID = (str: string): boolean => {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -55,4 +74,17 @@ export const getBuilds = async (projectNameOrId?: string, branchNameOrId?: strin
 export const getBuild = async (id: string): Promise<Build> => {
   const { data } = await apiClient.get<Build>(`/builds/${id}`)
   return data
+}
+
+export const getBuildArtifacts = async (buildId: string): Promise<Artifact[]> => {
+  const { data } = await apiClient.get<Artifact[]>(`/builds/${buildId}/artifacts`)
+  return data
+}
+
+export const deleteArtifact = async (artifactId: string): Promise<void> => {
+  await apiClient.delete(`/artifacts/${artifactId}`)
+}
+
+export const deleteBuildArtifacts = async (buildId: string): Promise<void> => {
+  await apiClient.delete(`/builds/${buildId}/artifacts`)
 }

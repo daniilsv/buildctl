@@ -17,5 +17,6 @@ func Execute() error {
 func init() {
 	rootCmd.AddCommand(eventCmd)
 	rootCmd.AddCommand(artifactCmd)
+	rootCmd.AddCommand(containerCmd)
 }
 

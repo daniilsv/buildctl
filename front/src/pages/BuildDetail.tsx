@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Download } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { getBuild } from "../api";
+import ArtifactsList from "../components/ArtifactsList";
 import {
   Accordion,
   AccordionContent,
@@ -125,6 +126,8 @@ export default function BuildDetail() {
           )}
         </CardContent>
       </Card>
+
+      <ArtifactsList buildId={id!} />
     </div>
   );
 }

@@ -102,7 +102,10 @@ func setupDependencies(cfg *config.Config) (*handlers.Dependencies, error) {
 	aiClient := ai.NewOpenAIClient(cfg.OpenAIAPIURL, cfg.OpenAIAPIKey, cfg.OpenAIModel)
 	notifier := notifications.NewTelegramNotifier(cfg.TelegramBotToken)
 
-	processor := workers.NewProcessor(queries, gitClient, aiClient, notifier)
+	// Инициализируем artifactService до processor, так как processor от него зависит
+	artifactService := services.NewArtifactService(queries, s3Service, cfg.S3PublicPrefix)
+
+	processor := workers.NewProcessor(queries, gitClient, aiClient, notifier, artifactService)
 	workerPool := workers.NewPool(cfg.WorkerPoolSize, processor)
 	workerPool.Start()
 
@@ -124,7 +127,6 @@ func setupDependencies(cfg *config.Config) (*handlers.Dependencies, error) {
 	branchService := services.NewBranchService(queries)
 	buildService := services.NewBuildService(queries)
 	eventService := services.NewEventService(queries, workerPool, gitClient)
-	artifactService := services.NewArtifactService(queries, s3Service)
 
 	return &handlers.Dependencies{
 		AuthService:     authService,

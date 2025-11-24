@@ -31,7 +31,7 @@ func NewHandlers(deps *Dependencies) *Handlers {
 		Branches:    branches.NewHandler(deps.BranchService, deps.Notifier),
 		Builds:      builds.NewHandler(deps.BuildService),
 		Events:      events.NewHandler(deps.EventService, deps.TokenValidator),
-		Artifacts:   artifacts.NewHandler(deps.ArtifactService, deps.TokenValidator),
+		Artifacts:   artifacts.NewHandler(deps.ArtifactService, deps.BuildService, deps.TokenValidator),
 		Tokens:      tokens.NewHandler(deps.TokenService),
 		OIDCService: deps.OIDCService,
 		TokenCache:  deps.TokenCache,

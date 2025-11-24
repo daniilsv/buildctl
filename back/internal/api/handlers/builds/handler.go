@@ -13,6 +13,7 @@ import (
 type Service interface {
 	GetBuild(ctx context.Context, id string) (*Build, error)
 	ListBuilds(ctx context.Context, projectID, branchID *string, limit, offset int) ([]Build, error)
+	GetBuildByProjectBranchCommit(ctx context.Context, projectName, branchName, commitHash string) (map[string]interface{}, error)
 }
 
 type Build struct {
