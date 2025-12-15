@@ -90,6 +90,8 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 		return nil
 	}
 
+	authorName := commits[0].Author
+
 	var summary string
 	cached, err := p.queries.GetCommitsSummary(ctx, &db.GetCommitsSummaryParams{
 		ProjectID: projectUUID,
@@ -164,7 +166,7 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 	}
 
 	// Отправляем уведомление с артефактами и образами
-	if err := p.notifier.SendBuildNotificationWithArtifacts(ctx, &project, &branch, commitHash, summary, artifactURLs, containerImages); err != nil {
+	if err := p.notifier.SendBuildNotificationWithArtifacts(ctx, &project, &branch, commitHash, authorName, summary, artifactURLs, containerImages); err != nil {
 		return fmt.Errorf("failed to send notification: %w", err)
 	}
 

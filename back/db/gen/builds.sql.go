@@ -51,27 +51,6 @@ func (q *Queries) CreateBuild(ctx context.Context, arg *CreateBuildParams) (Buil
 	return i, err
 }
 
-const GetBuildByCommitHash = `-- name: GetBuildByCommitHash :one
-SELECT id, project_id, branch_id, commit_hash, status, started_at, finished_at, created_at, commit_message FROM builds WHERE commit_hash = $1 LIMIT 1
-`
-
-func (q *Queries) GetBuildByCommitHash(ctx context.Context, commitHash string) (Build, error) {
-	row := q.db.QueryRow(ctx, GetBuildByCommitHash, commitHash)
-	var i Build
-	err := row.Scan(
-		&i.ID,
-		&i.ProjectID,
-		&i.BranchID,
-		&i.CommitHash,
-		&i.Status,
-		&i.StartedAt,
-		&i.FinishedAt,
-		&i.CreatedAt,
-		&i.CommitMessage,
-	)
-	return i, err
-}
-
 const GetBuildByID = `-- name: GetBuildByID :one
 SELECT id, project_id, branch_id, commit_hash, status, started_at, finished_at, created_at, commit_message FROM builds WHERE id = $1 LIMIT 1
 `

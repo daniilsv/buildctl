@@ -6,8 +6,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"log/slog"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type Service interface {
@@ -17,18 +18,18 @@ type Service interface {
 }
 
 type Build struct {
-	ID            string   `json:"id"`
-	ProjectID    string   `json:"project_id"`
-	ProjectName   string   `json:"project_name,omitempty"`
-	BranchID     string   `json:"branch_id"`
-	BranchName    string   `json:"branch_name,omitempty"`
-	CommitHash   string   `json:"commit_hash"`
-	CommitMessage string  `json:"commit_message,omitempty"`
-	Status       string   `json:"status"`
-	StartedAt    string   `json:"started_at"`
-	FinishedAt   string   `json:"finished_at,omitempty"`
-	CreatedAt    string   `json:"created_at"`
-	Logs         []Log    `json:"logs,omitempty"`
+	ID            string `json:"id"`
+	ProjectID     string `json:"project_id"`
+	ProjectName   string `json:"project_name,omitempty"`
+	BranchID      string `json:"branch_id"`
+	BranchName    string `json:"branch_name,omitempty"`
+	CommitHash    string `json:"commit_hash"`
+	CommitMessage string `json:"commit_message,omitempty"`
+	Status        string `json:"status"`
+	StartedAt     string `json:"started_at"`
+	FinishedAt    string `json:"finished_at,omitempty"`
+	CreatedAt     string `json:"created_at"`
+	Logs          []Log  `json:"logs,omitempty"`
 }
 
 type Log struct {
@@ -66,14 +67,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	projectName := r.URL.Query().Get("project_name")
 	branchID := r.URL.Query().Get("branch_id")
 	branchName := r.URL.Query().Get("branch_name")
-	
+
 	limit := 50
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil {
 			limit = parsed
 		}
 	}
-	
+
 	offset := 0
 	if o := r.URL.Query().Get("offset"); o != "" {
 		if parsed, err := strconv.Atoi(o); err == nil {
@@ -103,4 +104,3 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(builds)
 }
-

@@ -42,7 +42,11 @@ func (s *EventService) HandleEvent(ctx context.Context, req events.EventRequest)
 	}
 
 	var buildID uuid.UUID
-	existingBuild, err := s.queries.GetBuildByCommitHash(ctx, req.CommitHash)
+	existingBuild, err := s.queries.GetBuildByProjectBranchCommit(ctx, &db.GetBuildByProjectBranchCommitParams{
+		ProjectID:  project.ID,
+		BranchID:   branch.ID,
+		CommitHash: req.CommitHash,
+	})
 	if err == nil {
 		buildID = existingBuild.ID
 		s.queries.UpdateBuildStatus(ctx, &db.UpdateBuildStatusParams{
@@ -110,10 +114,10 @@ func (s *EventService) HandleEvent(ctx context.Context, req events.EventRequest)
 		s.workerPool.Submit(&workers.Task{
 			Type: workers.TaskTypeProcessFailed,
 			Data: map[string]interface{}{
-				"project_id":   project.ID.String(),
-				"branch_id":    branch.ID.String(),
-				"commit_hash":  req.CommitHash,
-				"build_id":     buildID.String(),
+				"project_id":    project.ID.String(),
+				"branch_id":     branch.ID.String(),
+				"commit_hash":   req.CommitHash,
+				"build_id":      buildID.String(),
 				"error_message": errorMessage,
 			},
 		})

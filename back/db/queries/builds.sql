@@ -1,9 +1,6 @@
 -- name: GetBuildByID :one
 SELECT * FROM builds WHERE id = $1 LIMIT 1;
 
--- name: GetBuildByCommitHash :one
-SELECT * FROM builds WHERE commit_hash = $1 LIMIT 1;
-
 -- name: GetBuildByProjectBranchCommit :one
 SELECT * FROM builds WHERE project_id = $1 AND branch_id = $2 AND commit_hash = $3 LIMIT 1;
 

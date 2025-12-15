@@ -81,6 +81,9 @@ func (c *GiteaClient) GetCommits(ctx context.Context, project *db.Project, branc
 		if gc.Sha == startHash {
 			foundStart = true
 		}
+		if gc.Sha == endHash {
+			break
+		}
 		if foundStart {
 			commits = append(commits, Commit{
 				Hash:    gc.Sha,
@@ -88,9 +91,6 @@ func (c *GiteaClient) GetCommits(ctx context.Context, project *db.Project, branc
 				Author:  gc.Commit.Author.Name,
 				Date:    gc.Commit.Author.Date,
 			})
-		}
-		if gc.Sha == endHash {
-			break
 		}
 	}
 	fmt.Printf("Fetched %d commits from Gitea API\n", len(commits))
