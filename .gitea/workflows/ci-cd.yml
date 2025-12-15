@@ -3,27 +3,27 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [main, develop]
-    # tags: ["v*"]
-  # pull_request:
-  #   branches: [main]
+
+env:
+  BUILD_ASSISTANT_TOKEN: ${{ vars.BCTL_TOKEN }}
+  BUILD_ASSISTANT_BACKEND: ${{ vars.BCTL_BACKEND }}
+  PROJECT_NAME: ${{ vars.BCTL_PROJECT_NAME }}
 
 jobs:
   build:
-    runs-on: mobile
+    runs-on: back
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Notify build started
-        run: |
-          buildctl event \
-            --token="${{ vars.BCTL_TOKEN }}" \
-            --backend="${{ vars.BCTL_BACKEND }}" \
-            --project="${{ vars.BCTL_PROJECT_NAME }}" \
-            --commit="${{ github.sha }}" \
-            --branch="${{ github.ref_name }}" \
-            --status="started"
-        continue-on-error: true
+        uses: daniilsv/buildctl-cli@v1.0.0
+        with:
+          action: event
+          token: ${{ env.BUILD_ASSISTANT_TOKEN }}
+          backend: ${{ env.BUILD_ASSISTANT_BACKEND }}
+          project: ${{ env.PROJECT_NAME }}
+          status: started
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -64,31 +64,25 @@ jobs:
             BUILDKIT_INLINE_CACHE=1
 
       - name: Register backend container
+        uses: daniilsv/buildctl-cli@v1.0.0
         if: success()
-        run: |
-          IMAGE_NAME="${{ env.GIT_DOMAIN }}/daniilsv/buildctl-back:${{ github.ref_name }}"
-          DIGEST="${{ steps.build-backend.outputs.digest }}"
-          buildctl container register \
-            --token="${{ vars.BCTL_TOKEN }}" \
-            --backend="${{ vars.BCTL_BACKEND }}" \
-            --project="${{ vars.BCTL_PROJECT_NAME }}" \
-            --branch="${{ github.ref_name }}" \
-            --commit="${{ github.sha }}" \
-            --image="$IMAGE_NAME" \
-            --digest="$DIGEST"
-        continue-on-error: true
+        with:
+          action: container
+          token: ${{ env.BUILD_ASSISTANT_TOKEN }}
+          backend: ${{ env.BUILD_ASSISTANT_BACKEND }}
+          project: ${{ env.PROJECT_NAME }}
+          image: ${{ env.GIT_DOMAIN }}/daniilsv/buildctl-back:${{ github.ref_name }}
+          digest: ${{ steps.build-backend.outputs.digest }}
 
       - name: Notify build in_progress
-        run: |
-          buildctl event \
-            --token="${{ vars.BCTL_TOKEN }}" \
-            --backend="${{ vars.BCTL_BACKEND }}" \
-            --project="${{ vars.BCTL_PROJECT_NAME }}" \
-            --commit="${{ github.sha }}" \
-            --branch="${{ github.ref_name }}" \
-            --log="Built backend image" \
-            --status="in_progress"
-        continue-on-error: true
+        uses: daniilsv/buildctl-cli@v1.0.0
+        with:
+          action: event
+          token: ${{ env.BUILD_ASSISTANT_TOKEN }}
+          backend: ${{ env.BUILD_ASSISTANT_BACKEND }}
+          project: ${{ env.PROJECT_NAME }}
+          status: in_progress
+          log: "Built backend image"
 
       - name: Extract metadata for frontend
         id: meta-frontend
@@ -119,87 +113,42 @@ jobs:
             BUILDKIT_INLINE_CACHE=1
 
       - name: Register frontend container
+        uses: daniilsv/buildctl-cli@v1.0.0
         if: success()
-        run: |
-          IMAGE_NAME="${{ env.GIT_DOMAIN }}/daniilsv/buildctl-front:${{ github.ref_name }}"
-          DIGEST="${{ steps.build-frontend.outputs.digest }}"
-          buildctl container register \
-            --token="${{ vars.BCTL_TOKEN }}" \
-            --backend="${{ vars.BCTL_BACKEND }}" \
-            --project="${{ vars.BCTL_PROJECT_NAME }}" \
-            --branch="${{ github.ref_name }}" \
-            --commit="${{ github.sha }}" \
-            --image="$IMAGE_NAME" \
-            --digest="$DIGEST"
-        continue-on-error: true
-
-      - name: Notify build in_progress
-        run: |
-          buildctl event \
-            --token="${{ vars.BCTL_TOKEN }}" \
-            --backend="${{ vars.BCTL_BACKEND }}" \
-            --project="${{ vars.BCTL_PROJECT_NAME }}" \
-            --commit="${{ github.sha }}" \
-            --branch="${{ github.ref_name }}" \
-            --log="Built frontend image" \
-            --status="in_progress"
-        continue-on-error: true
-
-      - name: Build CLI for Linux AMD64
-        run: |
-          cd ./cli
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o buildctl-linux-amd64 ./cmd/buildctl
-
-      - name: Upload CLI artifact
-        uses: https://github.com/christopherHX/gitea-upload-artifact@v4
         with:
-          name: buildctl-linux-amd64
-          path: cli/buildctl-linux-amd64
-
-      - name: Upload CLI artifact to build assistant (AMD64)
-        if: success()
-        run: |
-          buildctl artifact upload \
-            --token="${{ vars.BCTL_TOKEN }}" \
-            --backend="${{ vars.BCTL_BACKEND }}" \
-            --project="${{ vars.BCTL_PROJECT_NAME }}" \
-            --branch="${{ github.ref_name }}" \
-            --commit="${{ github.sha }}" \
-            --file="./cli/buildctl-linux-amd64"
-        continue-on-error: true
+          action: container
+          token: ${{ env.BUILD_ASSISTANT_TOKEN }}
+          backend: ${{ env.BUILD_ASSISTANT_BACKEND }}
+          project: ${{ env.PROJECT_NAME }}
+          image: ${{ env.GIT_DOMAIN }}/daniilsv/buildctl-front:${{ github.ref_name }}
+          digest: ${{ steps.build-frontend.outputs.digest }}
 
       - name: Notify build in_progress
-        run: |
-          buildctl event \
-            --token="${{ vars.BCTL_TOKEN }}" \
-            --backend="${{ vars.BCTL_BACKEND }}" \
-            --project="${{ vars.BCTL_PROJECT_NAME }}" \
-            --commit="${{ github.sha }}" \
-            --branch="${{ github.ref_name }}" \
-            --log="Built CLI" \
-            --status="in_progress"
-        continue-on-error: true
+        uses: daniilsv/buildctl-cli@v1.0.0
+        with:
+          action: event
+          token: ${{ env.BUILD_ASSISTANT_TOKEN }}
+          backend: ${{ env.BUILD_ASSISTANT_BACKEND }}
+          project: ${{ env.PROJECT_NAME }}
+          status: in_progress
+          log: "Built frontend image"
 
       - name: Notify build success
         if: success()
-        run: |
-          buildctl event \
-            --token="${{ vars.BCTL_TOKEN }}" \
-            --backend="${{ vars.BCTL_BACKEND }}" \
-            --project="${{ vars.BCTL_PROJECT_NAME }}" \
-            --commit="${{ github.sha }}" \
-            --branch="${{ github.ref_name }}" \
-            --status="success"
-        continue-on-error: true
+        uses: daniilsv/buildctl-cli@v1.0.0
+        with:
+          action: event
+          token: ${{ env.BUILD_ASSISTANT_TOKEN }}
+          backend: ${{ env.BUILD_ASSISTANT_BACKEND }}
+          project: ${{ env.PROJECT_NAME }}
+          status: success
 
       - name: Notify build failed
         if: failure()
-        run: |
-          buildctl event \
-            --token="${{ vars.BCTL_TOKEN }}" \
-            --backend="${{ vars.BCTL_BACKEND }}" \
-            --project="${{ vars.BCTL_PROJECT_NAME }}" \
-            --commit="${{ github.sha }}" \
-            --branch="${{ github.ref_name }}" \
-            --status="failed"
-        continue-on-error: true
+        uses: daniilsv/buildctl-cli@v1.0.0
+        with:
+          action: event
+          token: ${{ env.BUILD_ASSISTANT_TOKEN }}
+          backend: ${{ env.BUILD_ASSISTANT_BACKEND }}
+          project: ${{ env.PROJECT_NAME }}
+          status: failed
