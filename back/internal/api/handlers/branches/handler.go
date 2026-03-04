@@ -21,6 +21,7 @@ type Service interface {
 	GetBuildsByBranch(ctx context.Context, projectName, branchName string) ([]Build, error)
 	GetProjectByNameDB(ctx context.Context, name string) (*db.Project, error)
 	GetBranchByProjectAndNameDB(ctx context.Context, projectID uuid.UUID, branchName string) (*db.Branch, error)
+	Redeploy(ctx context.Context, projectName, branchName string) error
 }
 
 type Build struct {
@@ -223,4 +224,18 @@ func (h *Handler) TestWebhook(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Test webhook sent"})
+}
+
+func (h *Handler) Redeploy(w http.ResponseWriter, r *http.Request) {
+	projectName := chi.URLParam(r, "project_name")
+	branchName := chi.URLParam(r, "branch_name")
+
+	if err := h.service.Redeploy(r.Context(), projectName, branchName); err != nil {
+		slog.Error("Failed to trigger redeploy", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "accepted", "message": "Redeploy triggered"})
 }

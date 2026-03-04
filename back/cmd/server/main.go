@@ -127,7 +127,7 @@ func setupDependencies(cfg *config.Config) (*handlers.Dependencies, error) {
 
 	tokenService := services.NewTokenService(queries)
 	projectService := services.NewProjectService(queries)
-	branchService := services.NewBranchService(queries)
+	branchService := services.NewBranchService(queries, workerPool)
 	buildService := services.NewBuildService(queries)
 	eventService := services.NewEventService(queries, workerPool, gitClient)
 

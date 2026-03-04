@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { deleteProject, getBuilds, getProjectByName, updateProject } from "../api";
-import { getBranches, updateBranch } from "../api/branches";
+import { getBranches, redeployBranch, updateBranch } from "../api/branches";
 import CreateBranchForm from "../components/forms/CreateBranchForm";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -143,6 +143,7 @@ export default function ProjectDetail() {
                           View Builds
                         </Link>
                       </Button>
+                      <RedeployButton projectName={projectName!} branchName={branch.name} branch={branch} />
                       <EditBranchButton projectName={projectName!} branchName={branch.name} branch={branch} />
                     </div>
                   </div>
@@ -369,6 +370,40 @@ function EditProjectForm({
         <Button type="submit">Save</Button>
       </DialogFooter>
     </form>
+  );
+}
+
+function RedeployButton({ projectName, branchName, branch }: { projectName: string; branchName: string; branch: any }) {
+  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleRedeploy = async () => {
+    if (!branch.last_successful_commit) {
+      alert("No successful build to redeploy");
+      return;
+    }
+    setLoading(true);
+    try {
+      await redeployBranch(projectName, branchName);
+      queryClient.invalidateQueries({ queryKey: ["branches", projectName] });
+      queryClient.invalidateQueries({ queryKey: ["builds", projectName] });
+      alert("Redeploy triggered. Logs will appear in the last successful build.");
+    } catch (error: any) {
+      alert("Failed to trigger redeploy: " + (error.response?.data || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleRedeploy}
+      disabled={!branch.last_successful_commit || loading}
+    >
+      {loading ? "Deploying..." : "Redeploy"}
+    </Button>
   );
 }
 

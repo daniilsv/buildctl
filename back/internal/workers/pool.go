@@ -12,6 +12,7 @@ type TaskType string
 const (
 	TaskTypeProcessSuccess TaskType = "process_success"
 	TaskTypeProcessFailed  TaskType = "process_failed"
+	TaskTypeRedeploy       TaskType = "redeploy"
 )
 
 type Task struct {

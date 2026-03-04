@@ -56,6 +56,7 @@ func NewRouter(h *handlers.Handlers) chi.Router {
 					r.Get("/{branch_name}", h.Branches.Get)
 					r.Patch("/{branch_name}", h.Branches.Update)
 					r.Get("/{branch_name}/builds", h.Branches.GetBuilds)
+					r.Post("/{branch_name}/redeploy", h.Branches.Redeploy)
 					r.Post("/{branch_name}/test-telegram", h.Branches.TestTelegramNotification)
 					r.Post("/{branch_name}/test-webhook", h.Branches.TestWebhook)
 				})

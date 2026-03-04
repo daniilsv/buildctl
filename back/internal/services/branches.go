@@ -9,14 +9,16 @@ import (
 	"github.com/google/uuid"
 	db "github.com/build-assistant/back/db/gen"
 	"github.com/build-assistant/back/internal/api/handlers/branches"
+	"github.com/build-assistant/back/internal/workers"
 )
 
 type BranchService struct {
-	queries *db.Queries
+	queries    *db.Queries
+	workerPool *workers.Pool
 }
 
-func NewBranchService(queries *db.Queries) *BranchService {
-	return &BranchService{queries: queries}
+func NewBranchService(queries *db.Queries, workerPool *workers.Pool) *BranchService {
+	return &BranchService{queries: queries, workerPool: workerPool}
 }
 
 func (s *BranchService) CreateBranch(ctx context.Context, projectName string, req branches.CreateBranchRequest) (*branches.Branch, error) {
@@ -189,4 +191,44 @@ func (s *BranchService) GetBranchByProjectAndNameDB(ctx context.Context, project
 	}
 
 	return &dbBranch, nil
+}
+
+func (s *BranchService) Redeploy(ctx context.Context, projectName, branchName string) error {
+	project, err := s.queries.GetProjectByName(ctx, projectName)
+	if err != nil {
+		return fmt.Errorf("project not found: %w", err)
+	}
+
+	branch, err := s.queries.GetBranchByProjectAndName(ctx, &db.GetBranchByProjectAndNameParams{
+		ProjectID: project.ID,
+		Name:      branchName,
+	})
+	if err != nil {
+		return fmt.Errorf("branch not found: %w", err)
+	}
+
+	if branch.LastSuccessfulCommit == nil || *branch.LastSuccessfulCommit == "" {
+		return fmt.Errorf("no successful build for branch %s", branchName)
+	}
+
+	build, err := s.queries.GetBuildByProjectBranchCommit(ctx, &db.GetBuildByProjectBranchCommitParams{
+		ProjectID:  project.ID,
+		BranchID:   branch.ID,
+		CommitHash: *branch.LastSuccessfulCommit,
+	})
+	if err != nil {
+		return fmt.Errorf("last successful build not found: %w", err)
+	}
+
+	s.workerPool.Submit(&workers.Task{
+		Type: workers.TaskTypeRedeploy,
+		Data: map[string]interface{}{
+			"project_id":  project.ID.String(),
+			"branch_id":   branch.ID.String(),
+			"commit_hash": *branch.LastSuccessfulCommit,
+			"build_id":    build.ID.String(),
+		},
+	})
+
+	return nil
 }

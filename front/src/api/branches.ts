@@ -59,3 +59,8 @@ export const testBranchWebhook = async (projectName: string, branchName: string,
   return data
 }
 
+export const redeployBranch = async (projectName: string, branchName: string): Promise<{ status: string; message: string }> => {
+  const { data } = await apiClient.post<{ status: string; message: string }>(`/projects/${projectName}/branches/${branchName}/redeploy`)
+  return data
+}
+

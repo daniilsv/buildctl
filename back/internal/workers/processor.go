@@ -48,6 +48,8 @@ func (p *Processor) ProcessTask(ctx context.Context, task *Task) error {
 		return p.processSuccess(ctx, task)
 	case TaskTypeProcessFailed:
 		return p.processFailed(ctx, task)
+	case TaskTypeRedeploy:
+		return p.processRedeploy(ctx, task)
 	default:
 		return fmt.Errorf("unknown task type: %s", task.Type)
 	}
@@ -296,6 +298,65 @@ func (p *Processor) executeSSHActions(ctx context.Context, project *db.Project, 
 			Status:     status,
 			LogMessage: message,
 		})
+	}
+
+	return nil
+}
+
+func (p *Processor) processRedeploy(ctx context.Context, task *Task) error {
+	projectID := task.Data["project_id"].(string)
+	branchID := task.Data["branch_id"].(string)
+	commitHash := task.Data["commit_hash"].(string)
+	buildID := task.Data["build_id"].(string)
+
+	projectUUID, err := uuid.Parse(projectID)
+	if err != nil {
+		return fmt.Errorf("invalid project ID: %w", err)
+	}
+
+	branchUUID, err := uuid.Parse(branchID)
+	if err != nil {
+		return fmt.Errorf("invalid branch ID: %w", err)
+	}
+
+	buildUUID, err := uuid.Parse(buildID)
+	if err != nil {
+		return fmt.Errorf("invalid build ID: %w", err)
+	}
+
+	project, err := p.queries.GetProjectByID(ctx, projectUUID)
+	if err != nil {
+		return fmt.Errorf("project not found: %w", err)
+	}
+
+	branch, err := p.queries.GetBranchByID(ctx, branchUUID)
+	if err != nil {
+		return fmt.Errorf("branch not found: %w", err)
+	}
+
+	webhookResults, err := p.notifier.SendWebhooks(ctx, &project, &branch, commitHash)
+	if err != nil {
+		return fmt.Errorf("failed to send webhooks: %w", err)
+	}
+	for _, result := range webhookResults {
+		status := "webhook_success"
+		message := fmt.Sprintf("Webhook: %s - HTTP %d", result.URL, result.StatusCode)
+		if result.Error != nil {
+			status = "webhook_failed"
+			message = fmt.Sprintf("Webhook: %s - Error: %v", result.URL, result.Error)
+		}
+		p.queries.CreateBuildLog(ctx, &db.CreateBuildLogParams{
+			BuildID:    buildUUID,
+			ProjectID:  projectUUID,
+			BranchID:   branchUUID,
+			CommitHash: commitHash,
+			Status:     status,
+			LogMessage: message,
+		})
+	}
+
+	if err := p.executeSSHActions(ctx, &project, &branch, buildUUID, projectUUID, branchUUID, commitHash); err != nil {
+		slog.Error("Failed to execute ssh actions", "error", err)
 	}
 
 	return nil
