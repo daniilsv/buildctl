@@ -236,15 +236,15 @@ func (n *TelegramNotifier) SendFailedBuildNotification(ctx context.Context, proj
 	return nil
 }
 
-func (n *TelegramNotifier) SendWebhooks(ctx context.Context, project *db.Project, branch *db.Branch, commitHash string) error {
+func (n *TelegramNotifier) SendWebhooks(ctx context.Context, project *db.Project, branch *db.Branch, commitHash string) ([]WebhookResult, error) {
 	var projectSettings map[string]interface{}
 	if err := json.Unmarshal(project.Settings, &projectSettings); err != nil {
-		return fmt.Errorf("failed to parse project settings: %w", err)
+		return nil, fmt.Errorf("failed to parse project settings: %w", err)
 	}
 
 	var branchSettings map[string]interface{}
 	if err := json.Unmarshal(branch.Settings, &branchSettings); err != nil {
-		return fmt.Errorf("failed to parse branch settings: %w", err)
+		return nil, fmt.Errorf("failed to parse branch settings: %w", err)
 	}
 
 	var webhookURLs []interface{}
@@ -256,7 +256,7 @@ func (n *TelegramNotifier) SendWebhooks(ctx context.Context, project *db.Project
 	}
 
 	if len(webhookURLs) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	projectTitle := project.Title
@@ -273,25 +273,39 @@ func (n *TelegramNotifier) SendWebhooks(ctx context.Context, project *db.Project
 
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("failed to marshal payload: %w", err)
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
+	var results []WebhookResult
 	for _, url := range webhookURLs {
 		urlStr := fmt.Sprintf("%v", url)
 		req, err := http.NewRequestWithContext(ctx, "POST", urlStr, bytes.NewBuffer(jsonPayload))
 		if err != nil {
+			results = append(results, WebhookResult{URL: urlStr, StatusCode: 0, Error: err})
 			continue
 		}
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := n.client.Do(req)
 		if err != nil {
+			results = append(results, WebhookResult{URL: urlStr, StatusCode: 0, Error: err})
 			continue
 		}
+		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
+
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			results = append(results, WebhookResult{URL: urlStr, StatusCode: resp.StatusCode})
+		} else {
+			results = append(results, WebhookResult{
+				URL:        urlStr,
+				StatusCode: resp.StatusCode,
+				Error:      fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body)),
+			})
+		}
 	}
 
-	return nil
+	return results, nil
 }
 
 func (n *TelegramNotifier) SendTestTelegramNotification(ctx context.Context, project *db.Project, branch *db.Branch, chatID string, threadID *string) error {

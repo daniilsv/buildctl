@@ -15,6 +15,7 @@ import { Label } from "../components/ui/label";
 import { Select } from "../components/ui/select";
 import TelegramNotificationsList from "../components/forms/TelegramNotificationsList";
 import WebhookUrlsList from "../components/forms/WebhookUrlsList";
+import SSHActionsList, { SSHAction } from "../components/forms/SSHActionsList";
 
 export default function ProjectDetail() {
   const { id: projectName } = useParams<{ id: string }>();
@@ -242,6 +243,9 @@ function EditProjectForm({
   const [webhookUrls, setWebhookUrls] = useState<string[]>(
     project.settings?.webhook_urls || []
   );
+  const [sshActions, setSSHActions] = useState<SSHAction[]>(
+    project.settings?.ssh_actions || []
+  );
   const queryClient = useQueryClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -267,6 +271,12 @@ function EditProjectForm({
 
     if (webhookUrls.length > 0) {
       settings.webhook_urls = webhookUrls.filter((url) => url.trim() !== "");
+    }
+
+    if (sshActions.length > 0) {
+      settings.ssh_actions = sshActions.filter(
+        (a) => a.host && a.username && a.ssh_key_id && a.command
+      );
     }
 
     await updateProject(project.name, {
@@ -350,6 +360,8 @@ function EditProjectForm({
         projectName={project.name}
       />
 
+      <SSHActionsList value={sshActions} onChange={setSSHActions} />
+
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onSuccess}>
           Cancel
@@ -376,6 +388,9 @@ function EditBranchButton({ projectName, branchName, branch }: { projectName: st
   const [webhookUrls, setWebhookUrls] = useState<string[]>(
     branch.settings?.webhook_urls || []
   );
+  const [sshActions, setSSHActions] = useState<SSHAction[]>(
+    branch.settings?.ssh_actions || []
+  );
   const queryClient = useQueryClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -399,6 +414,12 @@ function EditBranchButton({ projectName, branchName, branch }: { projectName: st
 
     if (webhookUrls.length > 0) {
       settings.webhook_urls = webhookUrls.filter((url) => url.trim() !== "");
+    }
+
+    if (sshActions.length > 0) {
+      settings.ssh_actions = sshActions.filter(
+        (a) => a.host && a.username && a.ssh_key_id && a.command
+      );
     }
 
     await updateBranch(projectName, branchName, { settings });
@@ -430,6 +451,8 @@ function EditBranchButton({ projectName, branchName, branch }: { projectName: st
               projectName={projectName}
               branchName={branchName}
             />
+
+            <SSHActionsList value={sshActions} onChange={setSSHActions} />
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>

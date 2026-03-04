@@ -7,6 +7,7 @@ import (
 	"github.com/build-assistant/back/internal/api/handlers/builds"
 	"github.com/build-assistant/back/internal/api/handlers/events"
 	"github.com/build-assistant/back/internal/api/handlers/projects"
+	"github.com/build-assistant/back/internal/api/handlers/ssh_keys"
 	"github.com/build-assistant/back/internal/api/handlers/tokens"
 	"github.com/build-assistant/back/internal/auth"
 	"github.com/build-assistant/back/internal/notifications"
@@ -20,6 +21,7 @@ type Handlers struct {
 	Events      *events.Handler
 	Artifacts   *artifacts.Handler
 	Tokens      *tokens.Handler
+	SSHKeys     *ssh_keys.Handler
 	OIDCService *auth.OIDCService
 	TokenCache  *auth.TokenCache
 }
@@ -33,6 +35,7 @@ func NewHandlers(deps *Dependencies) *Handlers {
 		Events:      events.NewHandler(deps.EventService, deps.TokenValidator),
 		Artifacts:   artifacts.NewHandler(deps.ArtifactService, deps.BuildService, deps.TokenValidator),
 		Tokens:      tokens.NewHandler(deps.TokenService),
+		SSHKeys:     ssh_keys.NewHandler(deps.SSHKeyService),
 		OIDCService: deps.OIDCService,
 		TokenCache:  deps.TokenCache,
 	}
@@ -47,6 +50,7 @@ type Dependencies struct {
 	ArtifactService  artifacts.Service
 	TokenService     tokens.Service
 	TokenValidator   tokens.TokenValidator
+	SSHKeyService    ssh_keys.Service
 	Notifier         notifications.Notifier
 	OIDCService      *auth.OIDCService
 	TokenCache       *auth.TokenCache

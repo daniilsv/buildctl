@@ -92,3 +92,11 @@ type Project struct {
 	CreatedAt      pgtype.Timestamp
 	Title          string
 }
+
+type SshKey struct {
+	ID          uuid.UUID
+	Name        string
+	PrivateKey  string
+	Fingerprint string
+	CreatedAt   pgtype.Timestamp
+}

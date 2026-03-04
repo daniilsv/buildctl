@@ -2,7 +2,9 @@ package workers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -10,8 +12,10 @@ import (
 	"github.com/build-assistant/back/internal/ai"
 	"github.com/build-assistant/back/internal/git"
 	"github.com/build-assistant/back/internal/notifications"
+	"github.com/build-assistant/back/internal/ssh"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"log/slog"
 )
 
 type ArtifactService interface {
@@ -24,15 +28,17 @@ type Processor struct {
 	aiClient        ai.Client
 	notifier        notifications.Notifier
 	artifactService ArtifactService
+	sshExecutor     *ssh.Executor
 }
 
-func NewProcessor(queries *db.Queries, gitClient git.Client, aiClient ai.Client, notifier notifications.Notifier, artifactService ArtifactService) *Processor {
+func NewProcessor(queries *db.Queries, gitClient git.Client, aiClient ai.Client, notifier notifications.Notifier, artifactService ArtifactService, sshExecutor *ssh.Executor) *Processor {
 	return &Processor{
 		queries:         queries,
 		gitClient:       gitClient,
 		aiClient:        aiClient,
 		notifier:        notifier,
 		artifactService: artifactService,
+		sshExecutor:     sshExecutor,
 	}
 }
 
@@ -170,8 +176,29 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 		return fmt.Errorf("failed to send notification: %w", err)
 	}
 
-	if err := p.notifier.SendWebhooks(ctx, &project, &branch, commitHash); err != nil {
+	webhookResults, err := p.notifier.SendWebhooks(ctx, &project, &branch, commitHash)
+	if err != nil {
 		return fmt.Errorf("failed to send webhooks: %w", err)
+	}
+	for _, result := range webhookResults {
+		status := "webhook_success"
+		message := fmt.Sprintf("Webhook: %s - HTTP %d", result.URL, result.StatusCode)
+		if result.Error != nil {
+			status = "webhook_failed"
+			message = fmt.Sprintf("Webhook: %s - Error: %v", result.URL, result.Error)
+		}
+		p.queries.CreateBuildLog(ctx, &db.CreateBuildLogParams{
+			BuildID:    buildUUID,
+			ProjectID:  projectUUID,
+			BranchID:   branchUUID,
+			CommitHash: commitHash,
+			Status:     status,
+			LogMessage: message,
+		})
+	}
+
+	if err := p.executeSSHActions(ctx, &project, &branch, buildUUID, projectUUID, branchUUID, commitHash); err != nil {
+		slog.Error("Failed to execute ssh actions", "error", err)
 	}
 
 	p.queries.UpdateBranchLastSuccessful(ctx, &db.UpdateBranchLastSuccessfulParams{
@@ -179,6 +206,97 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 		LastSuccessfulCommit: &commitHash,
 		LastSuccessfulAt:     pgtype.Timestamp{Time: time.Now(), Valid: true},
 	})
+
+	return nil
+}
+
+func (p *Processor) executeSSHActions(ctx context.Context, project *db.Project, branch *db.Branch, buildUUID, projectUUID, branchUUID uuid.UUID, commitHash string) error {
+	if p.sshExecutor == nil {
+		return nil
+	}
+
+	var projectSettings map[string]interface{}
+	if err := json.Unmarshal(project.Settings, &projectSettings); err != nil {
+		return fmt.Errorf("parse project settings: %w", err)
+	}
+
+	var branchSettings map[string]interface{}
+	if err := json.Unmarshal(branch.Settings, &branchSettings); err != nil {
+		return fmt.Errorf("parse branch settings: %w", err)
+	}
+
+	var actions []map[string]interface{}
+	if branchActions, ok := branchSettings["ssh_actions"].([]interface{}); ok && len(branchActions) > 0 {
+		for _, a := range branchActions {
+			if m, ok := a.(map[string]interface{}); ok {
+				actions = append(actions, m)
+			}
+		}
+	}
+	if projectActions, ok := projectSettings["ssh_actions"].([]interface{}); ok && len(projectActions) > 0 {
+		for _, a := range projectActions {
+			if m, ok := a.(map[string]interface{}); ok {
+				actions = append(actions, m)
+			}
+		}
+	}
+
+	for _, m := range actions {
+		host, _ := m["host"].(string)
+		username, _ := m["username"].(string)
+		sshKeyID, _ := m["ssh_key_id"].(string)
+		command, _ := m["command"].(string)
+		if host == "" || username == "" || sshKeyID == "" || command == "" {
+			continue
+		}
+
+		port := 22
+		if p, ok := m["port"].(float64); ok {
+			port = int(p)
+		} else if p, ok := m["port"].(int); ok {
+			port = p
+		} else if ps, ok := m["port"].(string); ok {
+			if pv, err := strconv.Atoi(ps); err == nil {
+				port = pv
+			}
+		}
+
+		action := &ssh.SSHAction{
+			Host:     host,
+			Port:     port,
+			Username: username,
+			SSHKeyID: sshKeyID,
+			Command:  command,
+		}
+		result, err := p.sshExecutor.Execute(ctx, action)
+		status := "ssh_success"
+		var message string
+		if err != nil {
+			status = "ssh_failed"
+			message = fmt.Sprintf("SSH: %s@%s\nCommand: %s\nError: %v", username, host, command, err)
+			if result != nil && result.Stdout != "" {
+				message += fmt.Sprintf("\nOutput:\n%s", result.Stdout)
+			}
+			slog.Error("SSH action failed", "host", host, "error", err)
+		} else {
+			stdout := ""
+			if result != nil {
+				stdout = result.Stdout
+			}
+			message = fmt.Sprintf("SSH: %s@%s\nCommand: %s\nOutput:\n%s", username, host, command, stdout)
+			if result != nil && result.Stderr != "" {
+				message += fmt.Sprintf("\nStderr:\n%s", result.Stderr)
+			}
+		}
+		p.queries.CreateBuildLog(ctx, &db.CreateBuildLogParams{
+			BuildID:    buildUUID,
+			ProjectID:  projectUUID,
+			BranchID:   branchUUID,
+			CommitHash: commitHash,
+			Status:     status,
+			LogMessage: message,
+		})
+	}
 
 	return nil
 }
@@ -213,8 +331,30 @@ func (p *Processor) processFailed(ctx context.Context, task *Task) error {
 		return fmt.Errorf("failed to send failed notification: %w", err)
 	}
 
-	if err := p.notifier.SendWebhooks(ctx, &project, &branch, commitHash); err != nil {
+	webhookResults, err := p.notifier.SendWebhooks(ctx, &project, &branch, commitHash)
+	if err != nil {
 		return fmt.Errorf("failed to send webhooks: %w", err)
+	}
+
+	buildIDStr, _ := task.Data["build_id"].(string)
+	if buildIDStr != "" {
+		buildUUID, _ := uuid.Parse(buildIDStr)
+		for _, result := range webhookResults {
+			status := "webhook_success"
+			message := fmt.Sprintf("Webhook: %s - HTTP %d", result.URL, result.StatusCode)
+			if result.Error != nil {
+				status = "webhook_failed"
+				message = fmt.Sprintf("Webhook: %s - Error: %v", result.URL, result.Error)
+			}
+			p.queries.CreateBuildLog(ctx, &db.CreateBuildLogParams{
+				BuildID:    buildUUID,
+				ProjectID:  projectUUID,
+				BranchID:   branchUUID,
+				CommitHash: commitHash,
+				Status:     status,
+				LogMessage: message,
+			})
+		}
 	}
 
 	return nil

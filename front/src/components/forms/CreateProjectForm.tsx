@@ -8,6 +8,7 @@ import { Label } from '../ui/label'
 import { Select } from '../ui/select'
 import TelegramNotificationsList from './TelegramNotificationsList'
 import WebhookUrlsList from './WebhookUrlsList'
+import SSHActionsList, { SSHAction } from './SSHActionsList'
 
 interface CreateProjectData {
   name: string
@@ -27,6 +28,7 @@ export default function CreateProjectForm() {
   const [gitApiUrl, setGitApiUrl] = useState('https://git.int.sktaurus.ru/api/v1')
   const [telegramNotifications, setTelegramNotifications] = useState<Array<{ chat_id: string; thread_id: string }>>([])
   const [webhookUrls, setWebhookUrls] = useState<string[]>([])
+  const [sshActions, setSSHActions] = useState<SSHAction[]>([])
 
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -62,6 +64,12 @@ export default function CreateProjectForm() {
 
     if (webhookUrls.length > 0) {
       settings.webhook_urls = webhookUrls.filter((url) => url.trim() !== '')
+    }
+
+    if (sshActions.length > 0) {
+      settings.ssh_actions = sshActions.filter(
+        (a) => a.host && a.username && a.ssh_key_id && a.command
+      )
     }
 
     mutation.mutate({
@@ -150,6 +158,8 @@ export default function CreateProjectForm() {
       />
 
       <WebhookUrlsList value={webhookUrls} onChange={setWebhookUrls} />
+
+      <SSHActionsList value={sshActions} onChange={setSSHActions} />
 
       {mutation.isError && (
         <div className="text-sm text-destructive">

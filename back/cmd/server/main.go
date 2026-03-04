@@ -21,6 +21,7 @@ import (
 	"github.com/build-assistant/back/internal/git"
 	"github.com/build-assistant/back/internal/notifications"
 	"github.com/build-assistant/back/internal/services"
+	"github.com/build-assistant/back/internal/ssh"
 	"github.com/build-assistant/back/internal/workers"
 	"github.com/build-assistant/back/pkg/s3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -104,8 +105,10 @@ func setupDependencies(cfg *config.Config) (*handlers.Dependencies, error) {
 
 	// Инициализируем artifactService до processor, так как processor от него зависит
 	artifactService := services.NewArtifactService(queries, s3Service, cfg.S3PublicPrefix)
+	sshKeyService := services.NewSSHKeyService(queries)
+	sshExecutor := ssh.NewExecutor(sshKeyService)
 
-	processor := workers.NewProcessor(queries, gitClient, aiClient, notifier, artifactService)
+	processor := workers.NewProcessor(queries, gitClient, aiClient, notifier, artifactService, sshExecutor)
 	workerPool := workers.NewPool(cfg.WorkerPoolSize, processor)
 	workerPool.Start()
 
@@ -137,6 +140,7 @@ func setupDependencies(cfg *config.Config) (*handlers.Dependencies, error) {
 		ArtifactService: artifactService,
 		TokenService:    tokenService,
 		TokenValidator:  tokenService,
+		SSHKeyService:   sshKeyService,
 		Notifier:        notifier,
 		OIDCService:     oidcService,
 		TokenCache:      tokenCache,

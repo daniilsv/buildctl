@@ -35,8 +35,12 @@ export default function BuildDetail() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "success":
+      case "webhook_success":
+      case "ssh_success":
         return <Badge variant="success">{status}</Badge>;
       case "failed":
+      case "webhook_failed":
+      case "ssh_failed":
         return <Badge variant="destructive">{status}</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;

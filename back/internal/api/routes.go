@@ -73,6 +73,12 @@ func NewRouter(h *handlers.Handlers) chi.Router {
 				r.Post("/", h.Tokens.Create)
 				r.Delete("/{id}", h.Tokens.Delete)
 			})
+
+			r.Route("/ssh-keys", func(r chi.Router) {
+				r.Get("/", h.SSHKeys.List)
+				r.Post("/", h.SSHKeys.Create)
+				r.Delete("/{id}", h.SSHKeys.Delete)
+			})
 		})
 	})
 
