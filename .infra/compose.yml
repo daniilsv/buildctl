@@ -1,8 +1,8 @@
 version: '3.8'
 
 services:
-  backend:
-    image: git.int.sktaurus.ru/daniilsv/buildctl-back:latest
+  app:
+    image: git.int.sktaurus.ru/daniilsv/buildctl:latest
     environment:
       DATABASE_URL: ${DATABASE_URL}
       OIDC_ISSUER: ${OIDC_ISSUER:-}
@@ -22,11 +22,6 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       WORKER_POOL_SIZE: ${WORKER_POOL_SIZE:-3}
       PORT: 8080
-
-  frontend:
-    image: git.int.sktaurus.ru/daniilsv/buildctl-front:latest
     ports:
       - "3000:80"
-    depends_on:
-      - backend
 

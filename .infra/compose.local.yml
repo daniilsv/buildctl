@@ -17,8 +17,10 @@ services:
       timeout: 5s
       retries: 5
 
-  backend:
-    build: ../back
+  app:
+    build:
+      context: ..
+      dockerfile: .infra/Dockerfile
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/build_assistant?sslmode=disable
       OIDC_ISSUER: ${OIDC_ISSUER:-}
@@ -39,17 +41,10 @@ services:
       WORKER_POOL_SIZE: ${WORKER_POOL_SIZE:-3}
       PORT: 8080
     ports:
-      - "8080:8080"
+      - "3000:80"
     depends_on:
       postgres:
         condition: service_healthy
-
-  frontend:
-    build: ../front
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
 
 volumes:
   postgres_data:
