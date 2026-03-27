@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	db "github.com/build-assistant/back/db/gen"
@@ -27,12 +29,12 @@ func NewTelegramNotifier(botToken string) *TelegramNotifier {
 }
 
 func (n *TelegramNotifier) SendBuildNotification(ctx context.Context, project *db.Project, branch *db.Branch, commitHash, summary string, artifactURLs []string) error {
-	var projectSettings map[string]interface{}
+	var projectSettings map[string]any
 	if err := json.Unmarshal(project.Settings, &projectSettings); err != nil {
 		return fmt.Errorf("failed to parse project settings: %w", err)
 	}
 
-	var branchSettings map[string]interface{}
+	var branchSettings map[string]any
 	if err := json.Unmarshal(branch.Settings, &branchSettings); err != nil {
 		return fmt.Errorf("failed to parse branch settings: %w", err)
 	}
@@ -61,12 +63,13 @@ func (n *TelegramNotifier) SendBuildNotification(ctx context.Context, project *d
 		projectTitle = project.Name
 	}
 
-	message := fmt.Sprintf("🎉 Сборка завершена: [Проект: %s]\n\nВетка: %s\nКоммит: %s\n\n📝 Изменения:\n%s\n", projectTitle, branch.Name, commitHash[:8], summary)
+	var message strings.Builder
+	message.WriteString(fmt.Sprintf("🎉 Сборка завершена: [Проект: %s]\n\nВетка: %s\nКоммит: %s\n\n📝 Изменения:\n%s\n", projectTitle, branch.Name, commitHash[:8], summary))
 
 	if len(artifactURLs) > 0 {
-		message += "\n📦 Артефакты:\n"
+		message.WriteString("\n📦 Артефакты:\n")
 		for _, url := range artifactURLs {
-			message += fmt.Sprintf("• %s\n", url)
+			message.WriteString(fmt.Sprintf("• %s\n", url))
 		}
 	}
 
@@ -83,8 +86,9 @@ func (n *TelegramNotifier) SendBuildNotification(ctx context.Context, project *d
 			threadID = &threadIDStr
 		}
 
-		if err := n.sendMessage(ctx, chatIDStr, message, threadID); err != nil {
-			return fmt.Errorf("failed to send to chat %s: %w", chatIDStr, err)
+		if err := n.sendMessage(ctx, chatIDStr, message.String(), threadID); err != nil {
+			slog.Error("Failed to send Telegram notification", "chat_id", chatIDStr, "project", project.Name, "branch", branch.Name, "error", err)
+			continue
 		}
 	}
 
@@ -171,7 +175,8 @@ func (n *TelegramNotifier) SendBuildNotificationWithArtifacts(ctx context.Contex
 		}
 
 		if err := n.sendMessage(ctx, chatIDStr, message, threadID); err != nil {
-			return fmt.Errorf("failed to send to chat %s: %w", chatIDStr, err)
+			slog.Error("Failed to send Telegram notification", "chat_id", chatIDStr, "project", project.Name, "branch", branch.Name, "error", err)
+			continue
 		}
 	}
 
@@ -229,7 +234,8 @@ func (n *TelegramNotifier) SendFailedBuildNotification(ctx context.Context, proj
 		}
 
 		if err := n.sendMessage(ctx, chatIDStr, message, threadID); err != nil {
-			return fmt.Errorf("failed to send to chat %s: %w", chatIDStr, err)
+			slog.Error("Failed to send Telegram notification", "chat_id", chatIDStr, "project", project.Name, "branch", branch.Name, "error", err)
+			continue
 		}
 	}
 

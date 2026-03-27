@@ -173,11 +173,6 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 		}
 	}
 
-	// Отправляем уведомление с артефактами и образами
-	if err := p.notifier.SendBuildNotificationWithArtifacts(ctx, &project, &branch, commitHash, authorName, summary, artifactURLs, containerImages); err != nil {
-		return fmt.Errorf("failed to send notification: %w", err)
-	}
-
 	webhookResults, err := p.notifier.SendWebhooks(ctx, &project, &branch, commitHash)
 	if err != nil {
 		return fmt.Errorf("failed to send webhooks: %w", err)
@@ -197,6 +192,11 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 			Status:     status,
 			LogMessage: message,
 		})
+	}
+
+	// Отправляем уведомление с артефактами и образами
+	if err := p.notifier.SendBuildNotificationWithArtifacts(ctx, &project, &branch, commitHash, authorName, summary, artifactURLs, containerImages); err != nil {
+		return fmt.Errorf("failed to send notification: %w", err)
 	}
 
 	if err := p.executeSSHActions(ctx, &project, &branch, buildUUID, projectUUID, branchUUID, commitHash); err != nil {
@@ -388,10 +388,6 @@ func (p *Processor) processFailed(ctx context.Context, task *Task) error {
 		return fmt.Errorf("branch not found: %w", err)
 	}
 
-	if err := p.notifier.SendFailedBuildNotification(ctx, &project, &branch, commitHash, errorMessage); err != nil {
-		return fmt.Errorf("failed to send failed notification: %w", err)
-	}
-
 	webhookResults, err := p.notifier.SendWebhooks(ctx, &project, &branch, commitHash)
 	if err != nil {
 		return fmt.Errorf("failed to send webhooks: %w", err)
@@ -416,6 +412,10 @@ func (p *Processor) processFailed(ctx context.Context, task *Task) error {
 				LogMessage: message,
 			})
 		}
+	}
+
+	if err := p.notifier.SendFailedBuildNotification(ctx, &project, &branch, commitHash, errorMessage); err != nil {
+		return fmt.Errorf("failed to send failed notification: %w", err)
 	}
 
 	return nil
