@@ -15,13 +15,17 @@ import (
 )
 
 type TelegramNotifier struct {
-	botToken string
-	client   *http.Client
+	botToken      string
+	b24WebhookURL string
+	b24APIKey     string
+	client        *http.Client
 }
 
-func NewTelegramNotifier(botToken string) *TelegramNotifier {
+func NewTelegramNotifier(botToken, b24WebhookURL, b24APIKey string) *TelegramNotifier {
 	return &TelegramNotifier{
-		botToken: botToken,
+		botToken:      botToken,
+		b24WebhookURL: strings.TrimSpace(b24WebhookURL),
+		b24APIKey:     strings.TrimSpace(b24APIKey),
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -54,43 +58,44 @@ func (n *TelegramNotifier) SendBuildNotification(ctx context.Context, project *d
 		}
 	}
 
-	if len(notifications) == 0 {
-		return nil
-	}
-
 	projectTitle := project.Title
 	if projectTitle == "" {
 		projectTitle = project.Name
 	}
 
-	var message strings.Builder
-	message.WriteString(fmt.Sprintf("🎉 Сборка завершена: [Проект: %s]\n\nВетка: %s\nКоммит: %s\n\n📝 Изменения:\n%s\n", projectTitle, branch.Name, commitHash[:8], summary))
+	if len(notifications) > 0 {
+		var message strings.Builder
+		message.WriteString(fmt.Sprintf("🎉 Сборка завершена: [Проект: %s]\n\nВетка: %s\nКоммит: %s\n\n📝 Изменения:\n%s\n", projectTitle, branch.Name, commitHash[:8], summary))
 
-	if len(artifactURLs) > 0 {
-		message.WriteString("\n📦 Артефакты:\n")
-		for _, url := range artifactURLs {
-			message.WriteString(fmt.Sprintf("• %s\n", url))
+		if len(artifactURLs) > 0 {
+			message.WriteString("\n📦 Артефакты:\n")
+			for _, url := range artifactURLs {
+				message.WriteString(fmt.Sprintf("• %s\n", url))
+			}
+		}
+
+		for _, notif := range notifications {
+			chatID := notif["chat_id"]
+			if chatID == nil {
+				continue
+			}
+			chatIDStr := fmt.Sprintf("%v", chatID)
+
+			var threadID *string
+			if threadIDVal, ok := notif["thread_id"]; ok && threadIDVal != nil {
+				threadIDStr := fmt.Sprintf("%v", threadIDVal)
+				threadID = &threadIDStr
+			}
+
+			if err := n.sendMessage(ctx, chatIDStr, message.String(), threadID); err != nil {
+				slog.Error("Failed to send Telegram notification", "chat_id", chatIDStr, "project", project.Name, "branch", branch.Name, "error", err)
+				continue
+			}
 		}
 	}
 
-	for _, notif := range notifications {
-		chatID := notif["chat_id"]
-		if chatID == nil {
-			continue
-		}
-		chatIDStr := fmt.Sprintf("%v", chatID)
-
-		var threadID *string
-		if threadIDVal, ok := notif["thread_id"]; ok && threadIDVal != nil {
-			threadIDStr := fmt.Sprintf("%v", threadIDVal)
-			threadID = &threadIDStr
-		}
-
-		if err := n.sendMessage(ctx, chatIDStr, message.String(), threadID); err != nil {
-			slog.Error("Failed to send Telegram notification", "chat_id", chatIDStr, "project", project.Name, "branch", branch.Name, "error", err)
-			continue
-		}
-	}
+	b24Msg := buildB24SuccessLegacy(projectTitle, branch.Name, commitHash, summary, artifactURLs)
+	n.sendB24ForMessage(ctx, project, branch, b24Msg)
 
 	return nil
 }
@@ -121,17 +126,14 @@ func (n *TelegramNotifier) SendBuildNotificationWithArtifacts(ctx context.Contex
 		}
 	}
 
-	if len(notifications) == 0 {
-		return nil
-	}
-
 	projectTitle := project.Title
 	if projectTitle == "" {
 		projectTitle = project.Name
 	}
 
-	message := fmt.Sprintf(
-		`🎉 Сборка завершена: [Проект: %s]
+	if len(notifications) > 0 {
+		message := fmt.Sprintf(
+			`🎉 Сборка завершена: [Проект: %s]
 
 Ветка: %s
 Коммит: %s
@@ -140,45 +142,49 @@ func (n *TelegramNotifier) SendBuildNotificationWithArtifacts(ctx context.Contex
 📝 Изменения:
 %s
 `,
-		projectTitle,
-		branch.Name,
-		commitHash[:8],
-		authorName,
-		summary,
-	)
+			projectTitle,
+			branch.Name,
+			commitHash[:8],
+			authorName,
+			summary,
+		)
 
-	if len(artifactURLs) > 0 {
-		message += "\n📦 Файловые артефакты:\n"
-		for _, url := range artifactURLs {
-			message += fmt.Sprintf("• %s\n", url)
+		if len(artifactURLs) > 0 {
+			message += "\n📦 Файловые артефакты:\n"
+			for _, url := range artifactURLs {
+				message += fmt.Sprintf("• %s\n", url)
+			}
+		}
+
+		if len(containerImages) > 0 {
+			message += "\n🐳 Контейнерные образы:\n"
+			for _, image := range containerImages {
+				message += fmt.Sprintf("• %s\n", image)
+			}
+		}
+
+		for _, notif := range notifications {
+			chatID := notif["chat_id"]
+			if chatID == nil {
+				continue
+			}
+			chatIDStr := fmt.Sprintf("%v", chatID)
+
+			var threadID *string
+			if threadIDVal, ok := notif["thread_id"]; ok && threadIDVal != nil {
+				threadIDStr := fmt.Sprintf("%v", threadIDVal)
+				threadID = &threadIDStr
+			}
+
+			if err := n.sendMessage(ctx, chatIDStr, message, threadID); err != nil {
+				slog.Error("Failed to send Telegram notification", "chat_id", chatIDStr, "project", project.Name, "branch", branch.Name, "error", err)
+				continue
+			}
 		}
 	}
 
-	if len(containerImages) > 0 {
-		message += "\n🐳 Контейнерные образы:\n"
-		for _, image := range containerImages {
-			message += fmt.Sprintf("• %s\n", image)
-		}
-	}
-
-	for _, notif := range notifications {
-		chatID := notif["chat_id"]
-		if chatID == nil {
-			continue
-		}
-		chatIDStr := fmt.Sprintf("%v", chatID)
-
-		var threadID *string
-		if threadIDVal, ok := notif["thread_id"]; ok && threadIDVal != nil {
-			threadIDStr := fmt.Sprintf("%v", threadIDVal)
-			threadID = &threadIDStr
-		}
-
-		if err := n.sendMessage(ctx, chatIDStr, message, threadID); err != nil {
-			slog.Error("Failed to send Telegram notification", "chat_id", chatIDStr, "project", project.Name, "branch", branch.Name, "error", err)
-			continue
-		}
-	}
+	b24Msg := buildB24SuccessWithArtifacts(projectTitle, branch.Name, commitHash, authorName, summary, artifactURLs, containerImages)
+	n.sendB24ForMessage(ctx, project, branch, b24Msg)
 
 	return nil
 }
@@ -209,35 +215,36 @@ func (n *TelegramNotifier) SendFailedBuildNotification(ctx context.Context, proj
 		}
 	}
 
-	if len(notifications) == 0 {
-		return nil
-	}
-
 	projectTitle := project.Title
 	if projectTitle == "" {
 		projectTitle = project.Name
 	}
 
-	message := fmt.Sprintf("❌ Сборка провалилась: [Проект: %s]\n\nВетка: %s\nКоммит: %s\n\nОшибка:\n%s\n", projectTitle, branch.Name, commitHash[:8], errorMessage)
+	if len(notifications) > 0 {
+		message := fmt.Sprintf("❌ Сборка провалилась: [Проект: %s]\n\nВетка: %s\nКоммит: %s\n\nОшибка:\n%s\n", projectTitle, branch.Name, commitHash[:8], errorMessage)
 
-	for _, notif := range notifications {
-		chatID := notif["chat_id"]
-		if chatID == nil {
-			continue
-		}
-		chatIDStr := fmt.Sprintf("%v", chatID)
+		for _, notif := range notifications {
+			chatID := notif["chat_id"]
+			if chatID == nil {
+				continue
+			}
+			chatIDStr := fmt.Sprintf("%v", chatID)
 
-		var threadID *string
-		if threadIDVal, ok := notif["thread_id"]; ok && threadIDVal != nil {
-			threadIDStr := fmt.Sprintf("%v", threadIDVal)
-			threadID = &threadIDStr
-		}
+			var threadID *string
+			if threadIDVal, ok := notif["thread_id"]; ok && threadIDVal != nil {
+				threadIDStr := fmt.Sprintf("%v", threadIDVal)
+				threadID = &threadIDStr
+			}
 
-		if err := n.sendMessage(ctx, chatIDStr, message, threadID); err != nil {
-			slog.Error("Failed to send Telegram notification", "chat_id", chatIDStr, "project", project.Name, "branch", branch.Name, "error", err)
-			continue
+			if err := n.sendMessage(ctx, chatIDStr, message, threadID); err != nil {
+				slog.Error("Failed to send Telegram notification", "chat_id", chatIDStr, "project", project.Name, "branch", branch.Name, "error", err)
+				continue
+			}
 		}
 	}
+
+	b24Msg := buildB24Failed(projectTitle, branch.Name, commitHash, errorMessage)
+	n.sendB24ForMessage(ctx, project, branch, b24Msg)
 
 	return nil
 }

@@ -101,7 +101,7 @@ func setupDependencies(cfg *config.Config) (*handlers.Dependencies, error) {
 
 	gitClient := git.NewGiteaClient("https://git.int.sktaurus.ru/api/v1")
 	aiClient := ai.NewOpenAIClient(cfg.OpenAIAPIURL, cfg.OpenAIAPIKey, cfg.OpenAIModel)
-	notifier := notifications.NewTelegramNotifier(cfg.TelegramBotToken)
+	notifier := notifications.NewTelegramNotifier(cfg.TelegramBotToken, cfg.B24WebhookURL, cfg.B24APIKey)
 
 	// Инициализируем artifactService до processor, так как processor от него зависит
 	artifactService := services.NewArtifactService(queries, s3Service, cfg.S3PublicPrefix)

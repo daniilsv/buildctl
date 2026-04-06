@@ -7,6 +7,7 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Select } from '../ui/select'
 import TelegramNotificationsList from './TelegramNotificationsList'
+import B24NotificationsList from './B24NotificationsList'
 import WebhookUrlsList from './WebhookUrlsList'
 import SSHActionsList, { SSHAction } from './SSHActionsList'
 
@@ -27,6 +28,7 @@ export default function CreateProjectForm() {
   const [accessToken, setAccessToken] = useState('')
   const [gitApiUrl, setGitApiUrl] = useState('https://git.int.sktaurus.ru/api/v1')
   const [telegramNotifications, setTelegramNotifications] = useState<Array<{ chat_id: string; thread_id: string }>>([])
+  const [b24Notifications, setB24Notifications] = useState<Array<{ type_key: string }>>([])
   const [webhookUrls, setWebhookUrls] = useState<string[]>([])
   const [sshActions, setSSHActions] = useState<SSHAction[]>([])
 
@@ -64,6 +66,12 @@ export default function CreateProjectForm() {
 
     if (webhookUrls.length > 0) {
       settings.webhook_urls = webhookUrls.filter((url) => url.trim() !== '')
+    }
+
+    if (b24Notifications.length > 0) {
+      settings.b24_notifications = b24Notifications
+        .filter((row) => row.type_key.trim() !== '')
+        .map((row) => ({ type_key: row.type_key.trim() }))
     }
 
     if (sshActions.length > 0) {
@@ -156,6 +164,8 @@ export default function CreateProjectForm() {
         value={telegramNotifications}
         onChange={setTelegramNotifications}
       />
+
+      <B24NotificationsList value={b24Notifications} onChange={setB24Notifications} />
 
       <WebhookUrlsList value={webhookUrls} onChange={setWebhookUrls} />
 

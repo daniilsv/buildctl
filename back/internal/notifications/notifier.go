@@ -19,4 +19,5 @@ type Notifier interface {
 	SendWebhooks(ctx context.Context, project *db.Project, branch *db.Branch, commitHash string) ([]WebhookResult, error)
 	SendTestTelegramNotification(ctx context.Context, project *db.Project, branch *db.Branch, chatID string, threadID *string) error
 	SendTestWebhook(ctx context.Context, project *db.Project, branch *db.Branch, webhookURL string) error
+	SendTestB24Notification(ctx context.Context, project *db.Project, branch *db.Branch, typeKey string) error
 }

@@ -14,6 +14,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Select } from "../components/ui/select";
 import TelegramNotificationsList from "../components/forms/TelegramNotificationsList";
+import B24NotificationsList from "../components/forms/B24NotificationsList";
 import WebhookUrlsList from "../components/forms/WebhookUrlsList";
 import SSHActionsList, { SSHAction } from "../components/forms/SSHActionsList";
 
@@ -244,6 +245,16 @@ function EditProjectForm({
   const [webhookUrls, setWebhookUrls] = useState<string[]>(
     project.settings?.webhook_urls || []
   );
+  const [b24Notifications, setB24Notifications] = useState<
+    Array<{ type_key: string }>
+  >(() => {
+    if (project.settings?.b24_notifications) {
+      return project.settings.b24_notifications.map((row: any) => ({
+        type_key: String(row.type_key || ""),
+      }));
+    }
+    return [];
+  });
   const [sshActions, setSSHActions] = useState<SSHAction[]>(
     project.settings?.ssh_actions || []
   );
@@ -272,6 +283,12 @@ function EditProjectForm({
 
     if (webhookUrls.length > 0) {
       settings.webhook_urls = webhookUrls.filter((url) => url.trim() !== "");
+    }
+
+    if (b24Notifications.length > 0) {
+      settings.b24_notifications = b24Notifications
+        .filter((row) => row.type_key.trim() !== "")
+        .map((row) => ({ type_key: row.type_key.trim() }));
     }
 
     if (sshActions.length > 0) {
@@ -361,6 +378,12 @@ function EditProjectForm({
         projectName={project.name}
       />
 
+      <B24NotificationsList
+        value={b24Notifications}
+        onChange={setB24Notifications}
+        projectName={project.name}
+      />
+
       <SSHActionsList value={sshActions} onChange={setSSHActions} />
 
       <DialogFooter>
@@ -423,6 +446,16 @@ function EditBranchButton({ projectName, branchName, branch }: { projectName: st
   const [webhookUrls, setWebhookUrls] = useState<string[]>(
     branch.settings?.webhook_urls || []
   );
+  const [b24Notifications, setB24Notifications] = useState<
+    Array<{ type_key: string }>
+  >(() => {
+    if (branch.settings?.b24_notifications) {
+      return branch.settings.b24_notifications.map((row: any) => ({
+        type_key: String(row.type_key || ""),
+      }));
+    }
+    return [];
+  });
   const [sshActions, setSSHActions] = useState<SSHAction[]>(
     branch.settings?.ssh_actions || []
   );
@@ -449,6 +482,12 @@ function EditBranchButton({ projectName, branchName, branch }: { projectName: st
 
     if (webhookUrls.length > 0) {
       settings.webhook_urls = webhookUrls.filter((url) => url.trim() !== "");
+    }
+
+    if (b24Notifications.length > 0) {
+      settings.b24_notifications = b24Notifications
+        .filter((row) => row.type_key.trim() !== "")
+        .map((row) => ({ type_key: row.type_key.trim() }));
     }
 
     if (sshActions.length > 0) {
@@ -483,6 +522,13 @@ function EditBranchButton({ projectName, branchName, branch }: { projectName: st
             <WebhookUrlsList 
               value={webhookUrls} 
               onChange={setWebhookUrls}
+              projectName={projectName}
+              branchName={branchName}
+            />
+
+            <B24NotificationsList
+              value={b24Notifications}
+              onChange={setB24Notifications}
               projectName={projectName}
               branchName={branchName}
             />

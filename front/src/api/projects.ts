@@ -54,3 +54,10 @@ export const testProjectWebhook = async (name: string, webhookURL: string): Prom
   return data
 }
 
+export const testProjectB24Notification = async (name: string, typeKey: string): Promise<{ status: string; message: string }> => {
+  const { data } = await apiClient.post<{ status: string; message: string }>(`/projects/${name}/test-b24`, {
+    type_key: typeKey,
+  })
+  return data
+}
+

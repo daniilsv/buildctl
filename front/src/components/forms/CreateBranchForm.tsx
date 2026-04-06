@@ -6,6 +6,7 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import TelegramNotificationsList from './TelegramNotificationsList'
+import B24NotificationsList from './B24NotificationsList'
 import WebhookUrlsList from './WebhookUrlsList'
 import SSHActionsList, { SSHAction } from './SSHActionsList'
 
@@ -19,6 +20,7 @@ export default function CreateBranchForm({ onSuccess }: CreateBranchFormProps) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [autoDeploy, setAutoDeploy] = useState(false)
   const [telegramNotifications, setTelegramNotifications] = useState<Array<{ chat_id: string; thread_id: string }>>([])
+  const [b24Notifications, setB24Notifications] = useState<Array<{ type_key: string }>>([])
   const [webhookUrls, setWebhookUrls] = useState<string[]>([])
   const [sshActions, setSSHActions] = useState<SSHAction[]>([])
 
@@ -33,6 +35,7 @@ export default function CreateBranchForm({ onSuccess }: CreateBranchFormProps) {
       setNotificationsEnabled(true)
       setAutoDeploy(false)
       setTelegramNotifications([])
+      setB24Notifications([])
       setWebhookUrls([])
       setSSHActions([])
       if (onSuccess) {
@@ -65,6 +68,12 @@ export default function CreateBranchForm({ onSuccess }: CreateBranchFormProps) {
 
     if (webhookUrls.length > 0) {
       settings.webhook_urls = webhookUrls.filter((url) => url.trim() !== '')
+    }
+
+    if (b24Notifications.length > 0) {
+      settings.b24_notifications = b24Notifications
+        .filter((row) => row.type_key.trim() !== '')
+        .map((row) => ({ type_key: row.type_key.trim() }))
     }
 
     if (sshActions.length > 0) {
@@ -122,6 +131,12 @@ export default function CreateBranchForm({ onSuccess }: CreateBranchFormProps) {
       <TelegramNotificationsList
         value={telegramNotifications}
         onChange={setTelegramNotifications}
+        projectName={projectName}
+      />
+
+      <B24NotificationsList
+        value={b24Notifications}
+        onChange={setB24Notifications}
         projectName={projectName}
       />
 

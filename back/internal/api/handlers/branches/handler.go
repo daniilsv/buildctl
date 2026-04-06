@@ -226,6 +226,47 @@ func (h *Handler) TestWebhook(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Test webhook sent"})
 }
 
+func (h *Handler) TestB24Notification(w http.ResponseWriter, r *http.Request) {
+	projectName := chi.URLParam(r, "project_name")
+	branchName := chi.URLParam(r, "branch_name")
+
+	dbProject, err := h.service.GetProjectByNameDB(r.Context(), projectName)
+	if err != nil {
+		slog.Error("Failed to get project", "error", err)
+		http.Error(w, "Project not found", http.StatusNotFound)
+		return
+	}
+
+	dbBranch, err := h.service.GetBranchByProjectAndNameDB(r.Context(), dbProject.ID, branchName)
+	if err != nil {
+		slog.Error("Failed to get branch", "error", err)
+		http.Error(w, "Branch not found", http.StatusNotFound)
+		return
+	}
+
+	var req struct {
+		TypeKey string `json:"type_key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.TypeKey == "" {
+		http.Error(w, "type_key is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.notifier.SendTestB24Notification(r.Context(), dbProject, dbBranch, req.TypeKey); err != nil {
+		slog.Error("Failed to send test B24 notification", "error", err)
+		http.Error(w, "Failed to send test B24 notification: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Test B24 notification sent"})
+}
+
 func (h *Handler) Redeploy(w http.ResponseWriter, r *http.Request) {
 	projectName := chi.URLParam(r, "project_name")
 	branchName := chi.URLParam(r, "branch_name")

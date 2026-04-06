@@ -50,6 +50,7 @@ func NewRouter(h *handlers.Handlers) chi.Router {
 				r.Delete("/{name}", h.Projects.Delete)
 				r.Post("/{name}/test-telegram", h.Projects.TestTelegramNotification)
 				r.Post("/{name}/test-webhook", h.Projects.TestWebhook)
+				r.Post("/{name}/test-b24", h.Projects.TestB24Notification)
 				r.Route("/{project_name}/branches", func(r chi.Router) {
 					r.Get("/", h.Branches.List)
 					r.Post("/", h.Branches.Create)
@@ -59,6 +60,7 @@ func NewRouter(h *handlers.Handlers) chi.Router {
 					r.Post("/{branch_name}/redeploy", h.Branches.Redeploy)
 					r.Post("/{branch_name}/test-telegram", h.Branches.TestTelegramNotification)
 					r.Post("/{branch_name}/test-webhook", h.Branches.TestWebhook)
+					r.Post("/{branch_name}/test-b24", h.Branches.TestB24Notification)
 				})
 			})
 

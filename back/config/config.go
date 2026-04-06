@@ -30,6 +30,8 @@ type Config struct {
 	S3PublicPrefix string
 
 	TelegramBotToken string
+	B24WebhookURL    string
+	B24APIKey        string
 
 	WorkerPoolSize int
 }
@@ -55,6 +57,8 @@ func Load() (*Config, error) {
 		S3SecretKey:      getEnv("S3_SECRET_KEY", ""),
 		S3PublicPrefix:   getEnv("S3_PUBLIC_PREFIX", ""),
 		TelegramBotToken: getEnv("TELEGRAM_BOT_TOKEN", ""),
+		B24WebhookURL:    getEnv("B24_WEBHOOK_URL", ""),
+		B24APIKey:        getEnv("B24_API_KEY", ""),
 		WorkerPoolSize:   getEnvInt("WORKER_POOL_SIZE", 5),
 	}
 
