@@ -15,8 +15,8 @@ LIMIT $3 OFFSET $4;
 SELECT * FROM builds WHERE branch_id = $1 ORDER BY started_at DESC;
 
 -- name: CreateBuild :one
-INSERT INTO builds (project_id, branch_id, commit_hash, commit_message, status, started_at)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO builds (project_id, branch_id, commit_hash, commit_message, status, started_at, build_number)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
 -- name: UpdateBuildStatus :one
@@ -25,3 +25,6 @@ SET status = $2,
     finished_at = $3
 WHERE id = $1
 RETURNING *;
+
+-- name: UpdateBuildNumber :exec
+UPDATE builds SET build_number = $2 WHERE id = $1;
