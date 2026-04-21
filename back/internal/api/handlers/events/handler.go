@@ -22,6 +22,7 @@ type EventRequest struct {
 	Branch      string `json:"branch"`
 	Status      string `json:"status"`
 	Log         string `json:"log"`
+	BuildNumber string `json:"build_number,omitempty"`
 }
 
 type Handler struct {
