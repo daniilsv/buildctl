@@ -100,7 +100,7 @@ func (n *TelegramNotifier) SendBuildNotification(ctx context.Context, project *d
 	return nil
 }
 
-func (n *TelegramNotifier) SendBuildNotificationWithArtifacts(ctx context.Context, project *db.Project, branch *db.Branch, commitHash, authorName, summary string, artifactURLs []string, containerImages []string) error {
+func (n *TelegramNotifier) SendBuildNotificationWithArtifacts(ctx context.Context, project *db.Project, branch *db.Branch, commitHash, authorName, summary string, artifactURLs []string, containerImages []string, buildNumber string) error {
 	var projectSettings map[string]interface{}
 	if err := json.Unmarshal(project.Settings, &projectSettings); err != nil {
 		return fmt.Errorf("failed to parse project settings: %w", err)
@@ -132,22 +132,12 @@ func (n *TelegramNotifier) SendBuildNotificationWithArtifacts(ctx context.Contex
 	}
 
 	if len(notifications) > 0 {
-		message := fmt.Sprintf(
-			`🎉 Сборка завершена: [Проект: %s]
-
-Ветка: %s
-Коммит: %s
-Автор: %s
-
-📝 Изменения:
-%s
-`,
-			projectTitle,
-			branch.Name,
-			commitHash[:8],
-			authorName,
-			summary,
-		)
+		message := fmt.Sprintf("🎉 Сборка завершена: [Проект: %s]\n\nВетка: %s\nКоммит: %s\nАвтор: %s\n",
+			projectTitle, branch.Name, commitHash[:8], authorName)
+		if buildNumber != "" {
+			message += fmt.Sprintf("Сборка: #%s\n", buildNumber)
+		}
+		message += fmt.Sprintf("\n📝 Изменения:\n%s\n", summary)
 
 		if len(artifactURLs) > 0 {
 			message += "\n📦 Файловые артефакты:\n"
@@ -183,13 +173,13 @@ func (n *TelegramNotifier) SendBuildNotificationWithArtifacts(ctx context.Contex
 		}
 	}
 
-	b24Msg := buildB24SuccessWithArtifacts(projectTitle, branch.Name, commitHash, authorName, summary, artifactURLs, containerImages)
+	b24Msg := buildB24SuccessWithArtifacts(projectTitle, branch.Name, commitHash, authorName, summary, artifactURLs, containerImages, buildNumber)
 	n.sendB24ForMessage(ctx, project, branch, b24Msg)
 
 	return nil
 }
 
-func (n *TelegramNotifier) SendFailedBuildNotification(ctx context.Context, project *db.Project, branch *db.Branch, commitHash, errorMessage string) error {
+func (n *TelegramNotifier) SendFailedBuildNotification(ctx context.Context, project *db.Project, branch *db.Branch, commitHash, errorMessage, buildNumber string) error {
 	var projectSettings map[string]interface{}
 	if err := json.Unmarshal(project.Settings, &projectSettings); err != nil {
 		return fmt.Errorf("failed to parse project settings: %w", err)
@@ -221,7 +211,11 @@ func (n *TelegramNotifier) SendFailedBuildNotification(ctx context.Context, proj
 	}
 
 	if len(notifications) > 0 {
-		message := fmt.Sprintf("❌ Сборка провалилась: [Проект: %s]\n\nВетка: %s\nКоммит: %s\n\nОшибка:\n%s\n", projectTitle, branch.Name, commitHash[:8], errorMessage)
+		message := fmt.Sprintf("❌ Сборка провалилась: [Проект: %s]\n\nВетка: %s\nКоммит: %s\n", projectTitle, branch.Name, commitHash[:8])
+		if buildNumber != "" {
+			message += fmt.Sprintf("Сборка: #%s\n", buildNumber)
+		}
+		message += fmt.Sprintf("\nОшибка:\n%s\n", errorMessage)
 
 		for _, notif := range notifications {
 			chatID := notif["chat_id"]
@@ -243,7 +237,7 @@ func (n *TelegramNotifier) SendFailedBuildNotification(ctx context.Context, proj
 		}
 	}
 
-	b24Msg := buildB24Failed(projectTitle, branch.Name, commitHash, errorMessage)
+	b24Msg := buildB24Failed(projectTitle, branch.Name, commitHash, errorMessage, buildNumber)
 	n.sendB24ForMessage(ctx, project, branch, b24Msg)
 
 	return nil

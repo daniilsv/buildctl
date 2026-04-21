@@ -154,13 +154,17 @@ func buildB24SuccessLegacy(projectTitle, branchName, commitHash, summary string,
 	return strings.TrimRight(b.String(), "\n")
 }
 
-func buildB24SuccessWithArtifacts(projectTitle, branchName, commitHash, authorName, summary string, artifactURLs, containerImages []string) string {
+func buildB24SuccessWithArtifacts(projectTitle, branchName, commitHash, authorName, summary string, artifactURLs, containerImages []string, buildNumber string) string {
 	var b strings.Builder
 	b.WriteString("[COLOR=#008800][b]Сборка завершена[/b][/COLOR]\n\n")
 	b.WriteString(fmt.Sprintf("[b]Проект:[/b] %s\n", projectTitle))
 	b.WriteString(fmt.Sprintf("[b]Ветка:[/b] %s\n", branchName))
 	b.WriteString(fmt.Sprintf("[b]Коммит:[/b] %s\n", b24ShortCommit(commitHash)))
-	b.WriteString(fmt.Sprintf("[b]Автор:[/b] %s\n\n", authorName))
+	b.WriteString(fmt.Sprintf("[b]Автор:[/b] %s\n", authorName))
+	if buildNumber != "" {
+		b.WriteString(fmt.Sprintf("[b]Сборка:[/b] #%s\n", buildNumber))
+	}
+	b.WriteString("\n")
 	b.WriteString("[b]Изменения:[/b]\n")
 	if q := b24QuoteBlock(summary); q != "" {
 		b.WriteString(q)
@@ -190,13 +194,16 @@ func buildB24SuccessWithArtifacts(projectTitle, branchName, commitHash, authorNa
 	return strings.TrimRight(b.String(), "\n")
 }
 
-func buildB24Failed(projectTitle, branchName, commitHash, errorMessage string) string {
+func buildB24Failed(projectTitle, branchName, commitHash, errorMessage, buildNumber string) string {
 	var b strings.Builder
 	b.WriteString("[COLOR=#cc0000][b]Сборка провалилась[/b][/COLOR]\n\n")
 	b.WriteString(fmt.Sprintf("[b]Проект:[/b] %s\n", projectTitle))
 	b.WriteString(fmt.Sprintf("[b]Ветка:[/b] %s\n", branchName))
-	b.WriteString(fmt.Sprintf("[b]Коммит:[/b] %s\n\n", b24ShortCommit(commitHash)))
-	b.WriteString("[b]Ошибка:[/b]\n")
+	b.WriteString(fmt.Sprintf("[b]Коммит:[/b] %s\n", b24ShortCommit(commitHash)))
+	if buildNumber != "" {
+		b.WriteString(fmt.Sprintf("[b]Сборка:[/b] #%s\n", buildNumber))
+	}
+	b.WriteString("\n[b]Ошибка:[/b]\n")
 	if q := b24QuoteBlock(errorMessage); q != "" {
 		b.WriteString(q)
 	}

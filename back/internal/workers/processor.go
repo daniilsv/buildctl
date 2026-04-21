@@ -133,9 +133,14 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 		return fmt.Errorf("invalid build ID: %w", err)
 	}
 
-	_, err = p.queries.GetBuildByID(ctx, buildUUID)
+	build, err := p.queries.GetBuildByID(ctx, buildUUID)
 	if err != nil {
 		return fmt.Errorf("build not found: %w", err)
+	}
+
+	buildNumber := ""
+	if build.BuildNumber != nil {
+		buildNumber = *build.BuildNumber
 	}
 
 	// Загружаем артефакты из новой таблицы
@@ -195,7 +200,7 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 	}
 
 	// Отправляем уведомление с артефактами и образами
-	if err := p.notifier.SendBuildNotificationWithArtifacts(ctx, &project, &branch, commitHash, authorName, summary, artifactURLs, containerImages); err != nil {
+	if err := p.notifier.SendBuildNotificationWithArtifacts(ctx, &project, &branch, commitHash, authorName, summary, artifactURLs, containerImages, buildNumber); err != nil {
 		return fmt.Errorf("failed to send notification: %w", err)
 	}
 
@@ -393,9 +398,13 @@ func (p *Processor) processFailed(ctx context.Context, task *Task) error {
 		return fmt.Errorf("failed to send webhooks: %w", err)
 	}
 
+	buildNumber := ""
 	buildIDStr, _ := task.Data["build_id"].(string)
 	if buildIDStr != "" {
 		buildUUID, _ := uuid.Parse(buildIDStr)
+		if b, err := p.queries.GetBuildByID(ctx, buildUUID); err == nil && b.BuildNumber != nil {
+			buildNumber = *b.BuildNumber
+		}
 		for _, result := range webhookResults {
 			status := "webhook_success"
 			message := fmt.Sprintf("Webhook: %s - HTTP %d", result.URL, result.StatusCode)
@@ -414,7 +423,7 @@ func (p *Processor) processFailed(ctx context.Context, task *Task) error {
 		}
 	}
 
-	if err := p.notifier.SendFailedBuildNotification(ctx, &project, &branch, commitHash, errorMessage); err != nil {
+	if err := p.notifier.SendFailedBuildNotification(ctx, &project, &branch, commitHash, errorMessage, buildNumber); err != nil {
 		return fmt.Errorf("failed to send failed notification: %w", err)
 	}
 
