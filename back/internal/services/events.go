@@ -57,6 +57,12 @@ func (s *EventService) HandleEvent(ctx context.Context, req events.EventRequest)
 				Valid: req.Status == "success" || req.Status == "failed",
 			},
 		})
+		if req.BuildNumber != "" {
+			s.queries.UpdateBuildNumber(ctx, &db.UpdateBuildNumberParams{
+				ID:          buildID,
+				BuildNumber: &req.BuildNumber,
+			})
+		}
 	} else {
 		if req.Status == "started" {
 			var commitMessage *string
@@ -67,6 +73,11 @@ func (s *EventService) HandleEvent(ctx context.Context, req events.EventRequest)
 				}
 			}
 
+			var buildNumber *string
+			if req.BuildNumber != "" {
+				buildNumber = &req.BuildNumber
+			}
+
 			newBuild, err := s.queries.CreateBuild(ctx, &db.CreateBuildParams{
 				ProjectID:     project.ID,
 				BranchID:      branch.ID,
@@ -74,6 +85,7 @@ func (s *EventService) HandleEvent(ctx context.Context, req events.EventRequest)
 				CommitMessage: commitMessage,
 				Status:        req.Status,
 				StartedAt:     pgtype.Timestamp{Time: time.Now(), Valid: true},
+				BuildNumber:   buildNumber,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to create build: %w", err)
