@@ -199,6 +199,10 @@ func toBuild(b db.Build, project *db.Project, branch *db.Branch) *builds.Build {
 		build.CommitMessage = *b.CommitMessage
 	}
 
+	if b.BuildNumber != nil {
+		build.BuildNumber = *b.BuildNumber
+	}
+
 	return build
 }
 

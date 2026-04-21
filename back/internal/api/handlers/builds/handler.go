@@ -25,6 +25,7 @@ type Build struct {
 	BranchName    string `json:"branch_name,omitempty"`
 	CommitHash    string `json:"commit_hash"`
 	CommitMessage string `json:"commit_message,omitempty"`
+	BuildNumber   string `json:"build_number,omitempty"`
 	Status        string `json:"status"`
 	StartedAt     string `json:"started_at"`
 	FinishedAt    string `json:"finished_at,omitempty"`
