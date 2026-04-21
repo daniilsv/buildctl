@@ -13,9 +13,9 @@ import (
 )
 
 const CreateBuild = `-- name: CreateBuild :one
-INSERT INTO builds (project_id, branch_id, commit_hash, commit_message, status, started_at)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, project_id, branch_id, commit_hash, status, started_at, finished_at, created_at, commit_message
+INSERT INTO builds (project_id, branch_id, commit_hash, commit_message, status, started_at, build_number)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, project_id, branch_id, commit_hash, status, started_at, finished_at, created_at, commit_message, build_number
 `
 
 type CreateBuildParams struct {
@@ -25,6 +25,7 @@ type CreateBuildParams struct {
 	CommitMessage *string
 	Status        string
 	StartedAt     pgtype.Timestamp
+	BuildNumber   *string
 }
 
 func (q *Queries) CreateBuild(ctx context.Context, arg *CreateBuildParams) (Build, error) {
@@ -35,6 +36,7 @@ func (q *Queries) CreateBuild(ctx context.Context, arg *CreateBuildParams) (Buil
 		arg.CommitMessage,
 		arg.Status,
 		arg.StartedAt,
+		arg.BuildNumber,
 	)
 	var i Build
 	err := row.Scan(
@@ -47,12 +49,13 @@ func (q *Queries) CreateBuild(ctx context.Context, arg *CreateBuildParams) (Buil
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.CommitMessage,
+		&i.BuildNumber,
 	)
 	return i, err
 }
 
 const GetBuildByID = `-- name: GetBuildByID :one
-SELECT id, project_id, branch_id, commit_hash, status, started_at, finished_at, created_at, commit_message FROM builds WHERE id = $1 LIMIT 1
+SELECT id, project_id, branch_id, commit_hash, status, started_at, finished_at, created_at, commit_message, build_number FROM builds WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetBuildByID(ctx context.Context, id uuid.UUID) (Build, error) {
@@ -68,12 +71,13 @@ func (q *Queries) GetBuildByID(ctx context.Context, id uuid.UUID) (Build, error)
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.CommitMessage,
+		&i.BuildNumber,
 	)
 	return i, err
 }
 
 const GetBuildByProjectBranchCommit = `-- name: GetBuildByProjectBranchCommit :one
-SELECT id, project_id, branch_id, commit_hash, status, started_at, finished_at, created_at, commit_message FROM builds WHERE project_id = $1 AND branch_id = $2 AND commit_hash = $3 LIMIT 1
+SELECT id, project_id, branch_id, commit_hash, status, started_at, finished_at, created_at, commit_message, build_number FROM builds WHERE project_id = $1 AND branch_id = $2 AND commit_hash = $3 LIMIT 1
 `
 
 type GetBuildByProjectBranchCommitParams struct {
@@ -95,12 +99,13 @@ func (q *Queries) GetBuildByProjectBranchCommit(ctx context.Context, arg *GetBui
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.CommitMessage,
+		&i.BuildNumber,
 	)
 	return i, err
 }
 
 const GetBuildsByBranch = `-- name: GetBuildsByBranch :many
-SELECT id, project_id, branch_id, commit_hash, status, started_at, finished_at, created_at, commit_message FROM builds WHERE branch_id = $1 ORDER BY started_at DESC
+SELECT id, project_id, branch_id, commit_hash, status, started_at, finished_at, created_at, commit_message, build_number FROM builds WHERE branch_id = $1 ORDER BY started_at DESC
 `
 
 func (q *Queries) GetBuildsByBranch(ctx context.Context, branchID uuid.UUID) ([]Build, error) {
@@ -122,6 +127,7 @@ func (q *Queries) GetBuildsByBranch(ctx context.Context, branchID uuid.UUID) ([]
 			&i.FinishedAt,
 			&i.CreatedAt,
 			&i.CommitMessage,
+			&i.BuildNumber,
 		); err != nil {
 			return nil, err
 		}
@@ -134,7 +140,7 @@ func (q *Queries) GetBuildsByBranch(ctx context.Context, branchID uuid.UUID) ([]
 }
 
 const ListBuilds = `-- name: ListBuilds :many
-SELECT id, project_id, branch_id, commit_hash, status, started_at, finished_at, created_at, commit_message FROM builds
+SELECT id, project_id, branch_id, commit_hash, status, started_at, finished_at, created_at, commit_message, build_number FROM builds
 WHERE (($1::uuid IS NULL OR $1::uuid = '00000000-0000-0000-0000-000000000000'::uuid) OR project_id = $1)
   AND (($2::uuid IS NULL OR $2::uuid = '00000000-0000-0000-0000-000000000000'::uuid) OR branch_id = $2)
 ORDER BY started_at DESC
@@ -172,6 +178,7 @@ func (q *Queries) ListBuilds(ctx context.Context, arg *ListBuildsParams) ([]Buil
 			&i.FinishedAt,
 			&i.CreatedAt,
 			&i.CommitMessage,
+			&i.BuildNumber,
 		); err != nil {
 			return nil, err
 		}
@@ -183,12 +190,26 @@ func (q *Queries) ListBuilds(ctx context.Context, arg *ListBuildsParams) ([]Buil
 	return items, nil
 }
 
+const UpdateBuildNumber = `-- name: UpdateBuildNumber :exec
+UPDATE builds SET build_number = $2 WHERE id = $1
+`
+
+type UpdateBuildNumberParams struct {
+	ID          uuid.UUID
+	BuildNumber *string
+}
+
+func (q *Queries) UpdateBuildNumber(ctx context.Context, arg *UpdateBuildNumberParams) error {
+	_, err := q.db.Exec(ctx, UpdateBuildNumber, arg.ID, arg.BuildNumber)
+	return err
+}
+
 const UpdateBuildStatus = `-- name: UpdateBuildStatus :one
 UPDATE builds
 SET status = $2,
     finished_at = $3
 WHERE id = $1
-RETURNING id, project_id, branch_id, commit_hash, status, started_at, finished_at, created_at, commit_message
+RETURNING id, project_id, branch_id, commit_hash, status, started_at, finished_at, created_at, commit_message, build_number
 `
 
 type UpdateBuildStatusParams struct {
@@ -210,6 +231,7 @@ func (q *Queries) UpdateBuildStatus(ctx context.Context, arg *UpdateBuildStatusP
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.CommitMessage,
+		&i.BuildNumber,
 	)
 	return i, err
 }

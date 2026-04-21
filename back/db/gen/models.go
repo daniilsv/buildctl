@@ -57,6 +57,7 @@ type Build struct {
 	FinishedAt    pgtype.Timestamp
 	CreatedAt     pgtype.Timestamp
 	CommitMessage *string
+	BuildNumber   *string
 }
 
 type BuildLog struct {
