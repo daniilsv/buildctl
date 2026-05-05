@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"log/slog"
+
 	db "github.com/build-assistant/back/db/gen"
 	"github.com/build-assistant/back/internal/ai"
 	"github.com/build-assistant/back/internal/git"
@@ -15,7 +17,6 @@ import (
 	"github.com/build-assistant/back/internal/ssh"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"log/slog"
 )
 
 type ArtifactService interface {
@@ -180,7 +181,7 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 
 	webhookResults, err := p.notifier.SendWebhooks(ctx, &project, &branch, commitHash)
 	if err != nil {
-		return fmt.Errorf("failed to send webhooks: %w", err)
+		slog.Error("failed to send webhooks", "error", err)
 	}
 	for _, result := range webhookResults {
 		status := "webhook_success"
@@ -201,7 +202,7 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 
 	// Отправляем уведомление с артефактами и образами
 	if err := p.notifier.SendBuildNotificationWithArtifacts(ctx, &project, &branch, commitHash, authorName, summary, artifactURLs, containerImages, buildNumber); err != nil {
-		return fmt.Errorf("failed to send notification: %w", err)
+		slog.Error("failed to send notification", "error", err)
 	}
 
 	if err := p.executeSSHActions(ctx, &project, &branch, buildUUID, projectUUID, branchUUID, commitHash); err != nil {
@@ -341,7 +342,7 @@ func (p *Processor) processRedeploy(ctx context.Context, task *Task) error {
 
 	webhookResults, err := p.notifier.SendWebhooks(ctx, &project, &branch, commitHash)
 	if err != nil {
-		return fmt.Errorf("failed to send webhooks: %w", err)
+		slog.Error("failed to send webhooks", "error", err)
 	}
 	for _, result := range webhookResults {
 		status := "webhook_success"
