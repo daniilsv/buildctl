@@ -72,6 +72,11 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 		return fmt.Errorf("invalid branch ID: %w", err)
 	}
 
+	buildUUID, err := uuid.Parse(buildID)
+	if err != nil {
+		return fmt.Errorf("invalid build ID: %w", err)
+	}
+
 	project, err := p.queries.GetProjectByID(ctx, projectUUID)
 	if err != nil {
 		return fmt.Errorf("project not found: %w", err)
@@ -92,62 +97,60 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 
 	commits, err := p.gitClient.GetCommits(ctx, &project, &branch, commitHash, lastCommitHash)
 	if err != nil {
-		return fmt.Errorf("failed to get commits: %w", err)
+		slog.Error("failed to get commits, continuing without commit info", "error", err, "build_id", buildID, "project_id", projectID)
+		commits = nil
 	}
-
 	if len(commits) == 0 {
-		return nil
+		slog.Warn("no commits found between last successful and current, skipping notification but continuing pipeline", "build_id", buildID, "branch_id", branchID, "from", lastCommitHash, "to", commitHash)
 	}
 
-	authorName := commits[0].Author
+	authorName := ""
+	if len(commits) > 0 {
+		authorName = commits[0].Author
+	}
 
 	var summary string
-	cached, err := p.queries.GetCommitsSummary(ctx, &db.GetCommitsSummaryParams{
-		ProjectID: projectUUID,
-		StartHash: lastCommitHash,
-		EndHash:   commitHash,
-	})
-	if err == nil {
-		summary = cached.SummaryRu
-	} else {
-		messages := make([]string, len(commits))
-		for i, c := range commits {
-			messages[i] = c.Message
-		}
-
-		summary, err = p.aiClient.SummarizeCommits(ctx, messages)
-		if err != nil {
-			return fmt.Errorf("failed to summarize commits: %w", err)
-		}
-
-		p.queries.CreateCommitsSummary(ctx, &db.CreateCommitsSummaryParams{
-			ProjectID:   projectUUID,
-			StartHash:   lastCommitHash,
-			EndHash:     commitHash,
-			SummaryRu:   summary,
-			CommitCount: int32(len(commits)),
+	if len(commits) > 0 {
+		cached, cacheErr := p.queries.GetCommitsSummary(ctx, &db.GetCommitsSummaryParams{
+			ProjectID: projectUUID,
+			StartHash: lastCommitHash,
+			EndHash:   commitHash,
 		})
-	}
-
-	buildUUID, err := uuid.Parse(buildID)
-	if err != nil {
-		return fmt.Errorf("invalid build ID: %w", err)
-	}
-
-	build, err := p.queries.GetBuildByID(ctx, buildUUID)
-	if err != nil {
-		return fmt.Errorf("build not found: %w", err)
+		if cacheErr == nil {
+			summary = cached.SummaryRu
+		} else {
+			messages := make([]string, len(commits))
+			for i, c := range commits {
+				messages[i] = c.Message
+			}
+			s, aiErr := p.aiClient.SummarizeCommits(ctx, messages)
+			if aiErr != nil {
+				slog.Error("failed to summarize commits, continuing without summary", "error", aiErr, "build_id", buildID)
+			} else {
+				summary = s
+				p.queries.CreateCommitsSummary(ctx, &db.CreateCommitsSummaryParams{
+					ProjectID:   projectUUID,
+					StartHash:   lastCommitHash,
+					EndHash:     commitHash,
+					SummaryRu:   summary,
+					CommitCount: int32(len(commits)),
+				})
+			}
+		}
 	}
 
 	buildNumber := ""
-	if build.BuildNumber != nil {
+	if build, err := p.queries.GetBuildByID(ctx, buildUUID); err != nil {
+		slog.Error("build not found, continuing without build number", "error", err, "build_id", buildID)
+	} else if build.BuildNumber != nil {
 		buildNumber = *build.BuildNumber
 	}
 
 	// Загружаем артефакты из новой таблицы
 	artifacts, err := p.artifactService.GetBuildArtifactsAsInterface(ctx, buildUUID)
 	if err != nil {
-		return fmt.Errorf("failed to get artifacts: %w", err)
+		slog.Error("failed to get artifacts, continuing without them", "error", err, "build_id", buildID)
+		artifacts = nil
 	}
 
 	// Собираем информацию об артефактах
@@ -220,17 +223,24 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 
 func (p *Processor) executeSSHActions(ctx context.Context, project *db.Project, branch *db.Branch, buildUUID, projectUUID, branchUUID uuid.UUID, commitHash string) error {
 	if p.sshExecutor == nil {
+		slog.Warn("SSH executor not configured, skipping ssh actions", "build_id", buildUUID)
 		return nil
 	}
 
+	slog.Info("executing ssh actions", "build_id", buildUUID, "project_id", projectUUID, "branch_id", branchUUID)
+
 	var projectSettings map[string]interface{}
-	if err := json.Unmarshal(project.Settings, &projectSettings); err != nil {
-		return fmt.Errorf("parse project settings: %w", err)
+	if len(project.Settings) > 0 {
+		if err := json.Unmarshal(project.Settings, &projectSettings); err != nil {
+			slog.Error("parse project settings failed, continuing with empty", "error", err, "project_id", projectUUID)
+		}
 	}
 
 	var branchSettings map[string]interface{}
-	if err := json.Unmarshal(branch.Settings, &branchSettings); err != nil {
-		return fmt.Errorf("parse branch settings: %w", err)
+	if len(branch.Settings) > 0 {
+		if err := json.Unmarshal(branch.Settings, &branchSettings); err != nil {
+			slog.Error("parse branch settings failed, continuing with empty", "error", err, "branch_id", branchUUID)
+		}
 	}
 
 	var actions []map[string]interface{}
@@ -248,6 +258,12 @@ func (p *Processor) executeSSHActions(ctx context.Context, project *db.Project, 
 			}
 		}
 	}
+
+	if len(actions) == 0 {
+		slog.Info("no ssh actions configured for project/branch", "project_id", projectUUID, "branch_id", branchUUID)
+		return nil
+	}
+	slog.Info("ssh actions to execute", "count", len(actions), "build_id", buildUUID)
 
 	for _, m := range actions {
 		host, _ := m["host"].(string)
