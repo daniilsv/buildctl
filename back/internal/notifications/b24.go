@@ -48,9 +48,8 @@ func (n *TelegramNotifier) b24Configured() bool {
 
 func (n *TelegramNotifier) sendB24(ctx context.Context, typeKey, message string) error {
 	payload := map[string]string{
-		"api_key":   n.b24APIKey,
-		"type_key":  typeKey,
-		"message":   message,
+		"type_key": typeKey,
+		"message":  message,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -62,6 +61,7 @@ func (n *TelegramNotifier) sendB24(ctx context.Context, typeKey, message string)
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Alert-Api-Key", n.b24APIKey)
 
 	resp, err := n.client.Do(req)
 	if err != nil {
