@@ -31,14 +31,14 @@ func NewOpenAIClient(apiURL, apiKey, model string) *OpenAIClient {
 
 func (c *OpenAIClient) SummarizeCommits(ctx context.Context, messages []string) (string, error) {
 	var prompt strings.Builder
-	prompt.WriteString("Ты составляешь краткую сводку изменений по сообщениям git-коммитов для отчёта о сборке не больше 3 предложений.\n\n" +
+	prompt.WriteString("Ты составляешь краткую сводку изменений по сообщениям git-коммитов для отчёта о сборке.\n\n" +
 		"Правила:\n" +
-		"1. Опирайся строго на текст исходных сообщений коммитов, ничего не придумывай и не добавляй от себя.\n" +
+		"1. Опирайся СТРОГО на текст исходных сообщений коммитов. Ничего не придумывай, не добавляй и не дополняй от себя.\n" +
 		"2. Объединяй изменения по смыслу и убирай повторы: если несколько коммитов про одно и то же — опиши это один раз, не дублируя формулировки.\n" +
-		"3. Обязательно сохраняй номера задач, если они указаны в сообщениях (например, 12345, SD-123, #456, JIRA-1024), и ставь их рядом с соответствующим изменением.\n" +
+		"3. Номера задач переноси в сводку ТОЛЬКО если они дословно присутствуют в тексте коммита (например в форматах вида ABC-000, #000). Никогда не выдумывай, не подставляй и не угадывай номера задач, которых нет в исходных сообщениях. Если номера нет — не упоминай никакую задачу.\n" +
 		"4. Пиши на русском языке, кратко и по делу, без воды и без повторного пересказа одного и того же.\n" +
 		"5. Каждое отдельное изменение выводи отдельным пунктом с новой строки, начиная с «- ».\n" +
-		"6. Не используй markdown, заголовки, стилизацию и слово «коммит». В ответе верни только готовый текст сводки для отчёта.\n\n" +
+		"6. Не используй markdown, заголовки, стилизацию и слово «коммит». Не добавляй вводных фраз и двоеточий перед списком. В ответе верни только готовый текст сводки для отчёта.\n\n" +
 		"Сообщения коммитов:\n")
 	for _, msg := range messages {
 		prompt.WriteString(msg + "\n")
@@ -95,5 +95,23 @@ func (c *OpenAIClient) SummarizeCommits(ctx context.Context, messages []string) 
 		return "", fmt.Errorf("no choices in response")
 	}
 
-	return response.Choices[0].Message.Content, nil
+	return sanitizeSummary(response.Choices[0].Message.Content), nil
+}
+
+// sanitizeSummary убирает мусорные ведущие двоеточия/пробелы, которые модель
+// иногда добавляет перед списком, и обрезает пустые строки по краям.
+func sanitizeSummary(s string) string {
+	s = strings.TrimSpace(s)
+	lines := strings.Split(s, "\n")
+	cleaned := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Срезаем ведущее двоеточие (артефакт вида ": - изменение").
+		line = strings.TrimSpace(strings.TrimPrefix(line, ":"))
+		if line == "" {
+			continue
+		}
+		cleaned = append(cleaned, line)
+	}
+	return strings.Join(cleaned, "\n")
 }

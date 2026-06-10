@@ -86,6 +86,12 @@
   },
   "hotPaths": [
     {
+      "path": "back/internal/ai/openai.go",
+      "accessCount": 4,
+      "lastAccessed": 1781084740359,
+      "type": "file"
+    },
+    {
       "path": "back/internal/notifications/b24.go",
       "accessCount": 1,
       "lastAccessed": 1781082100065,
