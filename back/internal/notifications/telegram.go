@@ -32,7 +32,7 @@ func NewTelegramNotifier(botToken, b24WebhookURL, b24APIKey string) *TelegramNot
 	}
 }
 
-func (n *TelegramNotifier) SendBuildNotification(ctx context.Context, project *db.Project, branch *db.Branch, commitHash, summary string, artifactURLs []string) error {
+func (n *TelegramNotifier) SendBuildNotification(ctx context.Context, project *db.Project, branch *db.Branch, commitHash, summary string, artifacts []ArtifactLink) error {
 	var projectSettings map[string]any
 	if err := json.Unmarshal(project.Settings, &projectSettings); err != nil {
 		return fmt.Errorf("failed to parse project settings: %w", err)
@@ -67,10 +67,10 @@ func (n *TelegramNotifier) SendBuildNotification(ctx context.Context, project *d
 		var message strings.Builder
 		message.WriteString(fmt.Sprintf("🎉 Сборка завершена: [Проект: %s]\n\nВетка: %s\nКоммит: %s\n\n📝 Изменения:\n%s\n", projectTitle, branch.Name, commitHash[:8], summary))
 
-		if len(artifactURLs) > 0 {
+		if len(artifacts) > 0 {
 			message.WriteString("\n📦 Артефакты:\n")
-			for _, url := range artifactURLs {
-				message.WriteString(fmt.Sprintf("• %s\n", url))
+			for _, a := range artifacts {
+				message.WriteString(fmt.Sprintf("• %s - %s\n", a.Name, a.URL))
 			}
 		}
 
@@ -94,13 +94,13 @@ func (n *TelegramNotifier) SendBuildNotification(ctx context.Context, project *d
 		}
 	}
 
-	b24Msg := buildB24SuccessLegacy(projectTitle, branch.Name, commitHash, summary, artifactURLs)
+	b24Msg := buildB24SuccessLegacy(projectTitle, branch.Name, commitHash, summary, artifacts)
 	n.sendB24ForMessage(ctx, project, branch, b24Msg)
 
 	return nil
 }
 
-func (n *TelegramNotifier) SendBuildNotificationWithArtifacts(ctx context.Context, project *db.Project, branch *db.Branch, commitHash, authorName, summary string, artifactURLs []string, containerImages []string, buildNumber string) error {
+func (n *TelegramNotifier) SendBuildNotificationWithArtifacts(ctx context.Context, project *db.Project, branch *db.Branch, commitHash, authorName, summary string, artifacts []ArtifactLink, containerImages []string, buildNumber string) error {
 	var projectSettings map[string]interface{}
 	if err := json.Unmarshal(project.Settings, &projectSettings); err != nil {
 		return fmt.Errorf("failed to parse project settings: %w", err)
@@ -139,10 +139,10 @@ func (n *TelegramNotifier) SendBuildNotificationWithArtifacts(ctx context.Contex
 		}
 		message += fmt.Sprintf("\n📝 Изменения:\n%s\n", summary)
 
-		if len(artifactURLs) > 0 {
+		if len(artifacts) > 0 {
 			message += "\n📦 Файловые артефакты:\n"
-			for _, url := range artifactURLs {
-				message += fmt.Sprintf("• %s\n", url)
+			for _, a := range artifacts {
+				message += fmt.Sprintf("• %s - %s\n", a.Name, a.URL)
 			}
 		}
 
@@ -173,7 +173,7 @@ func (n *TelegramNotifier) SendBuildNotificationWithArtifacts(ctx context.Contex
 		}
 	}
 
-	b24Msg := buildB24SuccessWithArtifacts(projectTitle, branch.Name, commitHash, authorName, summary, artifactURLs, containerImages, buildNumber)
+	b24Msg := buildB24SuccessWithArtifacts(projectTitle, branch.Name, commitHash, authorName, summary, artifacts, containerImages, buildNumber)
 	n.sendB24ForMessage(ctx, project, branch, b24Msg)
 
 	return nil

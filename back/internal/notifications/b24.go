@@ -92,12 +92,15 @@ func b24QuoteBlock(text string) string {
 	return ">>: " + strings.ReplaceAll(text, "\n", "\n>>: ")
 }
 
-func b24LinkBB(url string) string {
+func b24LinkBB(name, url string) string {
 	u := strings.TrimSpace(url)
 	if u == "" {
 		return ""
 	}
-	label := u
+	label := strings.TrimSpace(name)
+	if label == "" {
+		label = u
+	}
 	if len(label) > 64 {
 		label = label[:61] + "..."
 	}
@@ -130,7 +133,7 @@ func (n *TelegramNotifier) sendB24ForMessage(ctx context.Context, project *db.Pr
 	}
 }
 
-func buildB24SuccessLegacy(projectTitle, branchName, commitHash, summary string, artifactURLs []string) string {
+func buildB24SuccessLegacy(projectTitle, branchName, commitHash, summary string, artifacts []ArtifactLink) string {
 	var b strings.Builder
 	b.WriteString("[COLOR=#008800][b]Сборка завершена[/b][/COLOR]\n\n")
 	b.WriteString(fmt.Sprintf("[b]Проект:[/b] %s\n", projectTitle))
@@ -141,10 +144,10 @@ func buildB24SuccessLegacy(projectTitle, branchName, commitHash, summary string,
 		b.WriteString(q)
 		b.WriteString("\n")
 	}
-	if len(artifactURLs) > 0 {
+	if len(artifacts) > 0 {
 		b.WriteString("\n[b]Артефакты:[/b]\n")
-		for _, u := range artifactURLs {
-			if link := b24LinkBB(u); link != "" {
+		for _, a := range artifacts {
+			if link := b24LinkBB(a.Name, a.URL); link != "" {
 				b.WriteString("• ")
 				b.WriteString(link)
 				b.WriteString("\n")
@@ -154,7 +157,7 @@ func buildB24SuccessLegacy(projectTitle, branchName, commitHash, summary string,
 	return strings.TrimRight(b.String(), "\n")
 }
 
-func buildB24SuccessWithArtifacts(projectTitle, branchName, commitHash, authorName, summary string, artifactURLs, containerImages []string, buildNumber string) string {
+func buildB24SuccessWithArtifacts(projectTitle, branchName, commitHash, authorName, summary string, artifacts []ArtifactLink, containerImages []string, buildNumber string) string {
 	var b strings.Builder
 	b.WriteString("[COLOR=#008800][b]Сборка завершена[/b][/COLOR]\n\n")
 	b.WriteString(fmt.Sprintf("[b]Проект:[/b] %s\n", projectTitle))
@@ -170,27 +173,17 @@ func buildB24SuccessWithArtifacts(projectTitle, branchName, commitHash, authorNa
 		b.WriteString(q)
 		b.WriteString("\n")
 	}
-	if len(artifactURLs) > 0 {
+	if len(artifacts) > 0 {
 		b.WriteString("\n[b]Файловые артефакты:[/b]\n")
-		for _, u := range artifactURLs {
-			if link := b24LinkBB(u); link != "" {
+		for _, a := range artifacts {
+			if link := b24LinkBB(a.Name, a.URL); link != "" {
 				b.WriteString("• ")
 				b.WriteString(link)
 				b.WriteString("\n")
 			}
 		}
 	}
-	if len(containerImages) > 0 {
-		b.WriteString("\n[b]Контейнерные образы:[/b]\n")
-		for _, img := range containerImages {
-			line := strings.TrimSpace(img)
-			if line != "" {
-				b.WriteString("• ")
-				b.WriteString(line)
-				b.WriteString("\n")
-			}
-		}
-	}
+	// Контейнерные образы намеренно не выводятся в тексте B24-сообщения.
 	return strings.TrimRight(b.String(), "\n")
 }
 

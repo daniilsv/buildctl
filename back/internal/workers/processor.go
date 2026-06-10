@@ -154,7 +154,7 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 	}
 
 	// Собираем информацию об артефактах
-	var artifactURLs []string
+	var artifactLinks []notifications.ArtifactLink
 	var containerImages []string
 
 	for _, artifact := range artifacts {
@@ -164,7 +164,7 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 
 			if artifactType == "file" && publicURL != "" {
 				filename, _ := artMap["filename"].(string)
-				artifactURLs = append(artifactURLs, fmt.Sprintf("%s - %s", filename, publicURL))
+				artifactLinks = append(artifactLinks, notifications.ArtifactLink{Name: filename, URL: publicURL})
 			} else if artifactType == "container_image" {
 				imageName, _ := artMap["image_name"].(string)
 				imageTag, _ := artMap["image_tag"].(string)
@@ -204,7 +204,7 @@ func (p *Processor) processSuccess(ctx context.Context, task *Task) error {
 	}
 
 	// Отправляем уведомление с артефактами и образами
-	if err := p.notifier.SendBuildNotificationWithArtifacts(ctx, &project, &branch, commitHash, authorName, summary, artifactURLs, containerImages, buildNumber); err != nil {
+	if err := p.notifier.SendBuildNotificationWithArtifacts(ctx, &project, &branch, commitHash, authorName, summary, artifactLinks, containerImages, buildNumber); err != nil {
 		slog.Error("failed to send notification", "error", err)
 	}
 

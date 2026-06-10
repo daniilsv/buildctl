@@ -1,0 +1,7 @@
+{
+  "tool_name": "mcp__serena__find_symbol",
+  "tool_input_preview": "{\"name_path\":\"SummarizeCommits\",\"relative_path\":\"back/internal/ai/openai.go\",\"include_body\":true}",
+  "error": "Error executing tool find_symbol: 1 validation error for applyArguments\nname_path_pattern\n  Field required [type=missing, input_value={'name_path': 'SummarizeC...', 'include_body': True}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/missing",
+  "timestamp": "2026-06-10T09:01:40.414Z",
+  "retry_count": 1
+}

@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"grep -rln \\\"SendBuildNotificationWithArtifacts\\\\|SendBuildNotification\\\\b\\\\|artifactURLs\\\\|ArtifactURLs\\\" --include=\\\"*.go\\\" . ; echo \\\"---TESTS---\\\"; ls internal/notifications/*_test.go 2...",
+  "error": "Exit code 1\ninternal/notifications/notifier.go\ninternal/notifications/b24.go\ninternal/notifications/telegram.go\ninternal/workers/processor.go\n---TESTS---\n(eval):1: no matches found: internal/notifications/*_test.go\n(eval):1: no matches found: internal/workers/*_test.go",
+  "timestamp": "2026-06-10T09:03:01.428Z",
+  "retry_count": 1
+}

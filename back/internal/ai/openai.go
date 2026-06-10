@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -29,9 +30,18 @@ func NewOpenAIClient(apiURL, apiKey, model string) *OpenAIClient {
 }
 
 func (c *OpenAIClient) SummarizeCommits(ctx context.Context, messages []string) (string, error) {
-	prompt := "You are mighty git commit summarizer and translator. Next i provide you a bunch of commit messages. Your role is to summarize them all in one with no more than 3 sentences at all and translate to Russian. In response give only translated summarized message that i can send to report. Omit word Commit, any markdown or styling!\n\nCommits:\n"
+	var prompt strings.Builder
+	prompt.WriteString("Ты составляешь краткую сводку изменений по сообщениям git-коммитов для отчёта о сборке не больше 3 предложений.\n\n" +
+		"Правила:\n" +
+		"1. Опирайся строго на текст исходных сообщений коммитов, ничего не придумывай и не добавляй от себя.\n" +
+		"2. Объединяй изменения по смыслу и убирай повторы: если несколько коммитов про одно и то же — опиши это один раз, не дублируя формулировки.\n" +
+		"3. Обязательно сохраняй номера задач, если они указаны в сообщениях (например, 12345, SD-123, #456, JIRA-1024), и ставь их рядом с соответствующим изменением.\n" +
+		"4. Пиши на русском языке, кратко и по делу, без воды и без повторного пересказа одного и того же.\n" +
+		"5. Каждое отдельное изменение выводи отдельным пунктом с новой строки, начиная с «- ».\n" +
+		"6. Не используй markdown, заголовки, стилизацию и слово «коммит». В ответе верни только готовый текст сводки для отчёта.\n\n" +
+		"Сообщения коммитов:\n")
 	for _, msg := range messages {
-		prompt += msg + "\n"
+		prompt.WriteString(msg + "\n")
 	}
 
 	reqBody := map[string]interface{}{
@@ -39,7 +49,7 @@ func (c *OpenAIClient) SummarizeCommits(ctx context.Context, messages []string) 
 		"messages": []map[string]interface{}{
 			{
 				"role":    "user",
-				"content": prompt,
+				"content": prompt.String(),
 			},
 		},
 		"max_tokens": 8096,
@@ -87,4 +97,3 @@ func (c *OpenAIClient) SummarizeCommits(ctx context.Context, messages []string) 
 
 	return response.Choices[0].Message.Content, nil
 }
-
