@@ -1,0 +1,32 @@
+# Credentials and local configuration (at every depth).
+**/.git
+**/.env
+**/.env.*
+**/.vscode
+**/.idea
+**/.ssh
+**/.aws
+**/.netrc
+**/.git-credentials
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/id_rsa*
+**/id_ed25519*
+
+# Local dependencies, outputs, and agent state.
+**/node_modules
+**/.pnpm-store
+**/dist
+**/build
+**/bin
+**/*.log
+**/.DS_Store
+**/.agents
+**/.codex
+**/.omc
+**/.serena
+.github
+.gitea
+.http_tests

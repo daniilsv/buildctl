@@ -208,3 +208,20 @@ DELETE /api/v1/builds/{build_id}/artifacts
 Authorization: Bearer <token>
 ```
 
+
+## GitHub Actions: сборка Docker
+
+Workflow `.github/workflows/docker-build.yml` собирает единый образ из
+`.infra/Dockerfile` на каждый push и pull request. Образ не публикуется,
+приложение не запускается; секреты и deployment не требуются.
+
+Локальная проверка:
+
+```bash
+docker build --platform linux/amd64 -f .infra/Dockerfile -t buildctl:local .
+```
+
+Локальные credentials задавайте через переменные окружения. Конфигурация
+`.vscode/launch.json` читает их через `${env:VARIABLE}`. Не коммитьте секреты.
+История этой копии очищена от прежнего файла с credentials; исходный
+репозиторий Тауруса сохранён отдельно, поэтому SHA исторических коммитов отличаются.
