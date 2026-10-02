@@ -212,8 +212,20 @@ Authorization: Bearer <token>
 ## GitHub Actions: сборка Docker
 
 Workflow `.github/workflows/docker-build.yml` собирает единый образ из
-`.infra/Dockerfile` на каждый push и pull request. Образ не публикуется,
-приложение не запускается; секреты и deployment не требуются.
+`.infra/Dockerfile`: pull request проверяет сборку, push в `main` или release-тег
+`vX.Y.Z` публикует private образ `ghcr.io/daniilsv/buildctl`. Публикация использует
+временный `GITHUB_TOKEN`, дополнительные PAT или repository secrets не нужны.
+Приложение не запускается, deployment не выполняется.
+
+Теги образа: `latest` для `main`, `sha-<полный SHA коммита>` для каждого push
+и версия без `v` (например, `1.2.3`) для release-тегов. Package остаётся private;
+workflow проверяет его связь с репозиторием, visibility, опубликованные теги и digest.
+
+После авторизации в GHCR с правом чтения package:
+
+```bash
+docker pull ghcr.io/daniilsv/buildctl:latest
+```
 
 Локальная проверка:
 

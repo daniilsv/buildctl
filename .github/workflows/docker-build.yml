@@ -1,14 +1,20 @@
-name: Docker build
+name: Docker build and publish
 
 on:
   push:
+    branches: [main]
+    tags: ['v*']
   pull_request:
 
 permissions:
   contents: read
 
+env:
+  IMAGE: ghcr.io/daniilsv/buildctl
+
 jobs:
   build:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -19,3 +25,103 @@ jobs:
 
       - name: Build Docker image
         run: docker build --platform linux/amd64 --file .infra/Dockerfile --tag buildctl:ci .
+
+  publish:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Check package ownership and visibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, urllib.error, urllib.request
+          url = "https://api.github.com/users/daniilsv/packages/container/buildctl"
+          headers = {"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                     "Accept": "application/vnd.github+json"}
+          try:
+              with urllib.request.urlopen(urllib.request.Request(url, headers=headers)) as response:
+                  package = json.load(response)
+          except urllib.error.HTTPError as error:
+              if error.code != 404:
+                  raise
+              print("Package does not exist yet; new GHCR packages default to private.")
+          else:
+              assert package["visibility"] == "private", "Package must remain private"
+              assert package["repository"]["full_name"] == os.environ["GITHUB_REPOSITORY"], "Package belongs to a different repository"
+              print("Existing package is private and linked to this repository.")
+          PYTHON
+
+      - name: Image tags and labels
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,format=long
+            type=semver,pattern={{version}}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and publish Docker image
+        id: push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: .infra/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Verify private package and published tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_DIGEST: ${{ steps.push.outputs.digest }}
+          EXPECTED_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, time, urllib.request
+          url = "https://api.github.com/users/daniilsv/packages/container/buildctl"
+          headers = {"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                     "Accept": "application/vnd.github+json"}
+          def read(endpoint):
+              with urllib.request.urlopen(urllib.request.Request(endpoint, headers=headers)) as response:
+                  return json.load(response)
+          package = read(url)
+          assert package["visibility"] == "private", "Package must remain private"
+          assert package["repository"]["full_name"] == os.environ["GITHUB_REPOSITORY"], "Unexpected package repository"
+          expected = {tag.rsplit(":", 1)[1] for tag in os.environ["EXPECTED_TAGS"].splitlines()}
+          digest = os.environ["EXPECTED_DIGEST"]
+          for attempt in range(5):
+              versions = read(url + "/versions?per_page=100")
+              actual = {tag for version in versions if version["name"] == digest
+                        for tag in version["metadata"]["container"]["tags"]}
+              if expected <= actual:
+                  break
+              time.sleep(2)
+          assert expected <= actual, "Published digest/tags not found"
+          summary = ("Private GHCR package verified: ghcr.io/daniilsv/buildctl\n"
+                     + "Digest: " + digest + "\nTags: " + ", ".join(sorted(expected)) + "\n")
+          print(summary)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as output:
+              output.write(summary)
+          PYTHON
